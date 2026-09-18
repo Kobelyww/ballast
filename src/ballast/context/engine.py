@@ -1,0 +1,263 @@
+"""Context engineering: the part of an agent that decides what the model gets to see.
+
+A transcript is not a log, it is a *window*, and the window is paid for on every
+request. Two mechanisms do almost all of the work in practice:
+
+* **offload** — an oversized tool result is stored by handle and replaced with a
+  preview plus a retrieval instruction. The information stays reachable; the
+  transcript stops carrying it on every subsequent turn.
+* **compaction** — older exchange *blocks* are folded into a running summary.
+  Blocks, not messages: an `assistant.tool_calls` message and its `tool` replies
+  must be removed together or the next request is structurally invalid.
+
+Both are toggleable so a benchmark can attribute a token delta to a specific
+mechanism instead of guessing.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
+
+from ..llm.base import system_message
+from ..support.text import ScratchStore, estimate_message_tokens, estimate_tokens
+
+
+@dataclass(slots=True)
+class ContextPolicy:
+    token_budget: int = 12_000
+    compact_threshold: float = 0.85
+    offload_threshold: int = 1_200
+    keep_recent_blocks: int = 8
+    preview_chars: int = 600
+    enable_offload: bool = True
+    enable_compaction: bool = True
+    offload_exempt: tuple[str, ...] = ("read_scratch",)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "token_budget": self.token_budget,
+            "compact_threshold": self.compact_threshold,
+            "offload_threshold": self.offload_threshold,
+            "keep_recent_blocks": self.keep_recent_blocks,
+            "enable_offload": self.enable_offload,
+            "enable_compaction": self.enable_compaction,
+        }
+
+
+@dataclass(slots=True)
+class ContextStats:
+    prompt_tokens: int = 0
+    offloads: int = 0
+    compactions: int = 0
+    saved_tokens: int = 0
+    dropped_blocks: int = 0
+    peak_prompt_tokens: int = 0
+    pinned_tokens: int = 0
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "offloads": self.offloads,
+            "compactions": self.compactions,
+            "saved_tokens": self.saved_tokens,
+            "dropped_blocks": self.dropped_blocks,
+            "peak_prompt_tokens": self.peak_prompt_tokens,
+            "pinned_tokens": self.pinned_tokens,
+        }
+
+
+Summarizer = Callable[[list[dict[str, Any]], str | None], str]
+
+
+class ContextEngine:
+    """Owns the message list and keeps it inside budget before the request, not after."""
+
+    def __init__(
+        self,
+        policy: ContextPolicy | None = None,
+        *,
+        scratch: ScratchStore | None = None,
+        summarizer: Summarizer | None = None,
+    ) -> None:
+        self.policy = policy or ContextPolicy()
+        self.scratch = scratch or ScratchStore()
+        self.summarizer = summarizer or extractive_summary
+        self.pins: list[dict[str, Any]] = [system_message("")]
+        self.transcript: list[dict[str, Any]] = []
+        self.summary: str | None = None
+        self.stats = ContextStats()
+
+    # ------------------------------------------------------------------ build
+    def pin(self, content: str, *, slot: int | None = None) -> None:
+        """Pinned text survives compaction: policy briefings, tool menus, retrieved skills."""
+        if slot is None:
+            self.pins.append(system_message(content))
+        else:
+            self.pins.insert(slot, system_message(content))
+
+    def user(self, content: str) -> None:
+        self.transcript.append({"role": "user", "content": content})
+
+    def assistant(self, content: str = "", tool_calls: list[dict[str, Any]] | None = None) -> None:
+        msg: dict[str, Any] = {"role": "assistant", "content": content or ""}
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+        self.transcript.append(msg)
+
+    def tool_result(self, call_id: str, name: str, content: str) -> str:
+        """Record a tool result, offloading it when it is too large to keep verbatim."""
+        tokens = estimate_tokens(content)
+        if self.policy.enable_offload and name not in self.policy.offload_exempt and tokens > self.policy.offload_threshold:
+            handle = self.scratch.put(f"{name}-{call_id}", content)
+            preview = _preview(content, self.policy.preview_chars)
+            replacement = (
+                f"[output {tokens}t moved out of context -> {handle}]\n"
+                f"head: {preview[0]}\n"
+                f"tail: {preview[1]}\n"
+                f"call read_scratch(handle, offset, limit) only if the preview is insufficient."
+            )
+            self.stats.offloads += 1
+            self.stats.saved_tokens += max(tokens - estimate_tokens(replacement), 0)
+            content = replacement
+        message: dict[str, Any] = {"role": "tool", "tool_call_id": call_id, "name": name, "content": content}
+        if name in self.policy.offload_exempt:
+            # The agent just paid a round trip to fetch this back; evicting it on the
+            # next compaction would make that spend repeat forever.
+            message[_PIN] = True
+        self.transcript.append(message)
+        return content
+
+    def add(self, message: dict[str, Any]) -> None:
+        self.transcript.append(message)
+
+    # --------------------------------------------------------------- assembly
+    def assemble(self) -> list[dict[str, Any]]:
+        """Return the exact message list to send, compacting first if over budget."""
+        self.stats.pinned_tokens = estimate_message_tokens(self.pins)
+        if self.policy.enable_compaction:
+            self._maybe_compact()
+        messages = [*self.pins]
+        if self.summary:
+            messages.append(system_message(f"[earlier context folded]\n{self.summary}"))
+        messages.extend(self.transcript)
+        self.stats.prompt_tokens = estimate_message_tokens(messages)
+        self.stats.peak_prompt_tokens = max(self.stats.peak_prompt_tokens, self.stats.prompt_tokens)
+        return messages
+
+    def _maybe_compact(self) -> None:
+        trigger = int(self.policy.token_budget * self.policy.compact_threshold)
+        current = estimate_message_tokens([*self.pins, *([system_message(self.summary)] if self.summary else []), *self.transcript])
+        if current <= trigger:
+            return
+        blocks = _split_blocks(self.transcript)
+        if len(blocks) <= self.policy.keep_recent_blocks + 1:
+            return
+        keep = len(blocks) - self.policy.keep_recent_blocks
+        # Pinned blocks are carried forward instead of folded away.
+        pinned = [b for b in blocks[:keep] if any(m.get(_PIN) for m in b)]
+        droppable = [b for b in blocks[:keep] if not any(m.get(_PIN) for m in b)]
+        if len(droppable) < 2:
+            return
+        self.summary = self.summarizer([m for b in droppable for m in b], self.summary)
+        self.stats.compactions += 1
+        self.stats.dropped_blocks += len(droppable)
+        kept = pinned + [b for b in blocks[keep:] if not any(m.get(_PIN) for m in b)]
+        self.transcript = [m for b in kept for m in b]
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "pins": self.pins,
+            "transcript": self.transcript,
+            "summary": self.summary,
+            "stats": self.stats.as_dict(),
+        }
+
+    @staticmethod
+    def restore(data: dict[str, Any], *, policy: ContextPolicy | None = None, scratch: ScratchStore | None = None) -> "ContextEngine":
+        engine = ContextEngine(policy or ContextPolicy(), scratch=scratch)
+        engine.pins = data.get("pins") or [system_message("")]
+        engine.transcript = data.get("transcript") or []
+        engine.summary = data.get("summary")
+        for key, value in (data.get("stats") or {}).items():
+            if hasattr(engine.stats, key):
+                setattr(engine.stats, key, value)
+        return engine
+
+
+_PIN = "_pin"
+
+
+def _split_blocks(messages: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Group an assistant tool-call with its tool replies so removal keeps the list valid."""
+    blocks: list[list[dict[str, Any]]] = []
+    for msg in messages:
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            blocks.append([msg])
+            continue
+        if msg.get("role") == "tool" and blocks and blocks[-1][-1].get("role") == "assistant" and blocks[-1][-1].get("tool_calls"):
+            blocks[-1].append(msg)
+            continue
+        blocks.append([msg])
+    return blocks
+
+
+def _preview(text: str, budget: int) -> tuple[str, str]:
+    if len(text) <= budget * 2:
+        return text, ""
+    head, tail = text[:budget], text[-budget:]
+    return _at_boundary(head), _at_boundary(tail, tail=True)
+
+
+def _at_boundary(text: str, *, tail: bool = False) -> str:
+    idx = text.rfind("\n") if not tail else text.find("\n")
+    if idx <= 0 or idx < len(text) * 0.5:
+        return text
+    return text[:idx] if not tail else text[idx:]
+
+
+_KEY_FACT = ("order_id", "customer_id", "amount", "paid_amount", "refund_id", "coupon_id", "status", "risk_score", "tier", "handle")
+
+
+def extractive_summary(messages: list[dict[str, Any]], previous: str | None = None) -> str:
+    """Deterministic fallback summariser: no model call, so compaction is free to ablate."""
+    lines: list[str] = [previous] if previous else []
+    for msg in messages:
+        role = msg.get("role")
+        if role == "assistant":
+            for call in msg.get("tool_calls") or []:
+                fn = call.get("function", {})
+                lines.append(f"- invoked {fn.get('name')}({ _short(fn.get('arguments')) })")
+        elif role == "tool":
+            content = str(msg.get("content", ""))
+            facts = {k: v for k, v in _flatten(content).items() if k in _KEY_FACT}
+            lines.append(f"- {msg.get('name')} -> {json.dumps(facts, ensure_ascii=False, default=str) if facts else _short(content)}")
+        elif role == "user":
+            lines.append(f"- user: {_short(str(msg.get('content', '')))}")
+    body = "\n".join(lines)
+    return body if estimate_tokens(body) < 1_500 else "\n".join(lines[-40:])
+
+
+def _flatten(content: str) -> dict[str, Any]:
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    out: dict[str, Any] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                out[key] = value
+            elif isinstance(value, dict):
+                for k2, v2 in value.items():
+                    if isinstance(v2, (str, int, float)):
+                        out[f"{key}.{k2}"] = v2
+    return out
+
+
+def _short(value: Any, limit: int = 120) -> str:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit] + "…"
