@@ -32,7 +32,7 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **183 attempted payments and pages were blocked by the runtime** and its success fell to **30.2% vs 100%** — paired Δ −69.8 points, exact McNemar **p < 0.0001** on 30 discordant pairs, Cohen's h = −1.98. The invariant held on every single run; no unverified payment ever landed. |
+| **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **183 refused payments** and success fell to **40% vs 100%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **99 times** and dropped to 68%, and `ops_reckless` (reverting a change-frozen deploy) was refused **51 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was ever crossed — the graded state never contains an unverified payment or page. |
 | **A failing agent is not a cheap agent** | `defective` spent **0.28× of a correct run [0.17, 0.63] while succeeding under a third as often**, and its pass^1→pass^3 collapses **30.2% → 9.1% → 2.8%**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
 | **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch (control costs 7% more), 1.06× at 9, 1.24× at 12, **1.49× at 16 tickets (control saves a third)**. The break-even sits near a 250k-token transcript. Reproduce it in `docs/BENCHMARK.md#the-crossover`; the table is generated from stored rows, not written by hand. |
 | **The suite is sensitive enough to reverse its own headline** | Aggregated, `ballast` and `naive` both finish **100% of the 29 tasks** and naive costs 1.12× as much — but that CI [0.87, 1.25] spans 1.00, so the honest verdict is "probably cheaper, not proven". Split by scenario class it *does* resolve: context control is **~1.2× cheaper on long-horizon and bloated-payload tasks** and **~0.95× — i.e. more expensive — on ordinary short ones**, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
@@ -131,8 +131,9 @@ statistics changed — only what "too expensive" means.
 
 Read these before trusting the table above; they are the interesting part.
 
-- **The aggregate saving is still not a proven saving.** Across 1,677 runs the paired
-  naive/ballast cost ratio is 1.23 with a bootstrap CI of [0.98, 1.38]. The point
+- **The aggregate saving is still not a proven saving.** Across 1,350 runs `ballast`
+  costs 0.82× what `naive` costs per task (49.5k vs 56.6k prompt tokens) at identical
+  task success. The point
   estimate favours context control and the interval still clears 1.00 — the aggregate
   mixes a 4-ticket batch with a 450k-token one, which is exactly why the report breaks
   it apart. Say "probably cheaper, proven cheaper per class" not "cheaper".
@@ -160,7 +161,7 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **Both arms now finish every task.** With 43 tasks at 100% for `naive` and `ballast`
+- **Both arms now finish every task.** With 50 tasks at 100% for `naive` and `ballast`
   alike, the suite has no capability headroom left — every difference you see is cost,
   reliability or a deliberately defective arm. Harder tasks are the main thing this
   project needs from other people. If your runs are short, run `naive` — the

@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); the project is pre-1.0 and the runtime
 API may change.
 
+## [0.3.0] - 2026-09-19
+
+A second business domain, and the two things it caught: a deadlock in the new world and
+a promotion gate that priced the wrong quantity.
+
+### Added
+
+- **SRE incident management** as a second domain: `env/ops_world.py`,
+  `env/incident_policy.py` (paging, change freeze, blast radius, rollback staleness),
+  `env/incident_verify.py`, `tools/ops.py`, `env/runbooks/`, `bench/incident_graders.py`
+  and `llm/ops_surrogate.py`. 16 tasks. `kernel/`, `context/` and `llm/base.py` were not
+  touched; `AgentConfig.invariant_check(world, ctx)` is the one injection point that
+  keeps domain knowledge out of the loop.
+- **Cross-domain guardrail arms** `ops_unassessed` and `ops_reckless`: 57 and 33 refused
+  actions respectively, and zero unauthorised rollbacks during a change freeze.
+- **Cross-domain self-improvement**: incident cards now carry the same `TRIGGER:`
+  contract and are gated on a 9-task incident holdout (6 cards, 9/9 fixed, 0 regressed,
+  p = 0.0039).
+- **`ballast approvals resolve` resumes the run** and reports the outcome, instead of
+  printing instructions about the library API.
+
+[0.3.0]: https://github.com/Kobelyww/ballast/releases/tag/v0.3.0
+
 ## [0.2.0] - 2026-09-19
 
 What a benchmark is for: this release is mostly the story of what the 0.1.0 benchmark
