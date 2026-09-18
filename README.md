@@ -32,11 +32,12 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 100%** — paired Δ −77.8 points, exact McNemar **p = 0.0001**, Cohen's h = −2.16. The invariant held on every single run; no unverified payment ever landed. |
-| **A failing agent is not a cheap agent** | `defective` spent **0.45× of a correct run while succeeding a fifth as often**, and its pass^1→pass^3 collapses 22.2% → 4.9% → 1.1%. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
+| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **183 attempted payments and pages were blocked by the runtime** and its success fell to **30.2% vs 100%** — paired Δ −69.8 points, exact McNemar **p < 0.0001** on 30 discordant pairs, Cohen's h = −1.98. The invariant held on every single run; no unverified payment ever landed. |
+| **A failing agent is not a cheap agent** | `defective` spent **0.28× of a correct run [0.17, 0.63] while succeeding under a third as often**, and its pass^1→pass^3 collapses **30.2% → 9.1% → 2.8%**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
 | **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch (control costs 7% more), 1.06× at 9, 1.24× at 12, **1.49× at 16 tickets (control saves a third)**. The break-even sits near a 250k-token transcript. Reproduce it in `docs/BENCHMARK.md#the-crossover`; the table is generated from stored rows, not written by hand. |
 | **The suite is sensitive enough to reverse its own headline** | Aggregated, `ballast` and `naive` both finish **100% of the 29 tasks** and naive costs 1.12× as much — but that CI [0.87, 1.25] spans 1.00, so the honest verdict is "probably cheaper, not proven". Split by scenario class it *does* resolve: context control is **~1.2× cheaper on long-horizon and bloated-payload tasks** and **~0.95× — i.e. more expensive — on ordinary short ones**, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
-| **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
+| **Reliability decays where capability does not** | Under `pass^k`, `noisy` falls **76.7% → 58.9% → 45.2%** and `tight_budget` **90.7% → 82.3% → 74.6%** across three consecutive draws. A pass@1 demo cannot see either curve, and both are the number a reviewer will quote you. |
+| **Guardrails travel to a second domain** | SRE incidents, added without touching the kernel: `ops_unassessed` (pages without a policy assessment) is refused **57 times** and loses 20.9 points (p = 0.0039); `ops_reckless` (insists on reverting a change-frozen deploy) is refused **33 times** with **0 unauthorised rollbacks** across every frozen scenario. |
 | **Structured errors buy recovery** | The `noisy` arm produced **279 agent faults from malformed calls** (114 unknown arguments, 102 missing required ones, 63 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success** (Δ −27.8 points, p = 0.063) — a raise-and-crash tool layer converts it into 0%. |
 | **Long horizons found us a real bug, and the arms localized it** | On the 12-ticket batch, `ballast` initially finished **8/12** while `naive` finished 12/12. Disabling *only* compaction recovered all 12; disabling *only* offloading changed nothing — which pointed straight at compaction folding away (a) the task instruction and (b) the record of which tickets were already closed. See below. |
 | **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
@@ -116,9 +117,11 @@ invisible.
 
 Read these before trusting the table above; they are the interesting part.
 
-- **The aggregate saving is not yet a proven saving.** Paired naive/ballast cost ratio is
-  1.12 with a bootstrap CI of [0.87, 1.25]. The point estimate favours context control;
-  29 tasks cannot prove it, and a single headline built from that would be marketing.
+- **The aggregate saving is still not a proven saving.** Across 1,677 runs the paired
+  naive/ballast cost ratio is 1.23 with a bootstrap CI of [0.98, 1.38]. The point
+  estimate favours context control and the interval still clears 1.00 — the aggregate
+  mixes a 4-ticket batch with a 450k-token one, which is exactly why the report breaks
+  it apart. Say "probably cheaper, proven cheaper per class" not "cheaper".
   The class breakdown is better powered because it stops mixing a 450k-token batch run
   with 2k-token lookups — but it is still only 17-24 paired tasks, and the report
   suppresses intervals below five rather than printing confident-looking noise.
@@ -143,9 +146,10 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **`naive` still beats `ballast` on task success (100% vs 94.4%).** Context control is
-  measurably cheaper and provably not free: at this task length nothing needed the
-  savings, and one compaction cost a task. If your runs are short, run `naive` — the
+- **Both arms now finish every task.** With 43 tasks at 100% for `naive` and `ballast`
+  alike, the suite has no capability headroom left — every difference you see is cost,
+  reliability or a deliberately defective arm. Harder tasks are the main thing this
+  project needs from other people. If your runs are short, run `naive` — the
   benchmark says so explicitly, which is the point of having one.
 - **Long-horizon coverage is thin.** `S17_fat_order` (40-line order) and
   `S18_batch_queue` (5 tickets in one context) exercise offload-then-refetch and
