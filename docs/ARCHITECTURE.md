@@ -132,6 +132,19 @@ make it a legitimate measurement instrument:
   following and is documented as such — with a real provider the same code measures the
   real thing.
 
+## Two domains, one runtime
+
+`env/` and `tools/` hold two independent business verticals — after-sales refunds and
+SRE incident management — each with its own SQLite world, pure-function policy engine,
+document corpus, grader and offline policy driver. The kernel is unchanged between
+them and deliberately knows nothing about either: invariant checking arrives as
+`AgentConfig.invariant_check(world, ctx)`, and omitting it while asking for critique
+raises instead of quietly doing nothing.
+
+That separation is why the cross-domain numbers (1,032 runs in
+`bench/results/cross-domain.json`) are evidence rather than vocabulary: "runtime, not
+application" is checkable by reading which files the second domain touched.
+
 ## The world
 
 `env/world.py` is SQLite with a frozen clock (`fixture["now"]`), so a 7-day refund
