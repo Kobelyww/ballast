@@ -41,6 +41,11 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 | **Long horizons found us a real bug, and the arms localized it** | On the 12-ticket batch, `ballast` initially finished **8/12** while `naive` finished 12/12. Disabling *only* compaction recovered all 12; disabling *only* offloading changed nothing — which pointed straight at compaction folding away (a) the task instruction and (b) the record of which tickets were already closed. See below. |
 | **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
 
+## The two bugs this benchmark found in itself
+
+Both are in `## The bug this benchmark found in itself` below; the second one is the
+crossover, which turned a feature argument into a curve.
+
 ## The bug this benchmark found in itself
 
 `S19_batch_twelve` — close a queue of 12 tickets in one transcript — passed on the
@@ -149,7 +154,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 608 tests, ~15 seconds, no API key, no external network
+make test     # 588 tests, ~15 seconds, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
