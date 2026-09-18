@@ -59,15 +59,17 @@ class Arm:
         )
 
 
-UNBOUNDED = {"max_cost": 1e6, "max_steps": 200, "max_wall_s": 600.0, "max_prompt_tokens": 400_000}
-TIGHT = {"max_cost": 0.35, "max_steps": 12, "max_wall_s": 120.0, "max_prompt_tokens": 6_000}
+# A real serving window, not an infinite one: "no context control" is only a fair arm
+# if the transcript can actually outgrow the model.
+REAL_WINDOW = {"max_cost": 1e6, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 32_000}
+TIGHT = {"max_cost": 0.5, "max_steps": 60, "max_wall_s": 300.0, "max_prompt_tokens": 9_000}
 
 BASE = Arm(
     name="ballast",
     note="default runtime: offload + compaction + retrieved briefing + one critic round",
     context={"token_budget": 9_000, "compact_threshold": 0.85, "offload_threshold": 1_200, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]},
-    budget={"max_cost": 1.2, "max_steps": 40, "max_wall_s": 300.0, "max_prompt_tokens": 20_000},
-    runtime={"strategy": "react", "critic_rounds": 1, "enable_sop_briefing": True, "enable_skills": False, "soft_degrade": True},
+    budget={"max_cost": 6.0, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 32_000},
+    runtime={"strategy": "react", "critic_rounds": 1, "enable_sop_briefing": True, "enable_skills": False, "soft_degrade": True, "max_iterations": 120},
 )
 
 DEFAULT_ARMS: dict[str, Arm] = {
@@ -75,8 +77,8 @@ DEFAULT_ARMS: dict[str, Arm] = {
         "naive",
         "no context control, no critic, unbounded budget — the default most demos ship",
         context={"enable_offload": False, "enable_compaction": False, "token_budget": 400_000},
-        budget=dict(UNBOUNDED),
-        runtime={"critic_rounds": 0, "enable_sop_briefing": False, "soft_degrade": False},
+        budget=dict(REAL_WINDOW),
+        runtime={"critic_rounds": 0, "enable_sop_briefing": False, "soft_degrade": False, "max_iterations": 120},
     ),
     "ballast": BASE,
     "no_offload": Arm("no_offload", "tool outputs stay verbatim in the transcript", context={"enable_offload": False}, runtime={"enable_skills": False}, budget=BASE.budget),
@@ -88,8 +90,8 @@ DEFAULT_ARMS: dict[str, Arm] = {
         budget=BASE.budget,
     ),
     "static_briefing": Arm("static_briefing", "whole SOP pasted into the system prompt instead of retrieved", runtime={"briefing_mode": "static"}, budget=BASE.budget),
-    "tight_budget": Arm("tight_budget", "budget too small to finish naively; forces soft degradation", budget=dict(TIGHT), runtime={"max_iterations": 12}, context={"token_budget": 5_000}),
-    "no_budget": Arm("no_budget", "no ceiling at all, for the cost of the same policy without control", budget=dict(UNBOUNDED)),
+    "tight_budget": Arm("tight_budget", "budget too small to finish naively; forces soft degradation", budget=dict(TIGHT), runtime={"max_iterations": 60}, context={"token_budget": 5_000, "offload_threshold": 1_200, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]}),
+    "no_budget": Arm("no_budget", "no ceiling: what the same policy costs when nothing stops it", budget={"max_cost": 1e6, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 1_000_000}),
     "hierarchical": Arm("hierarchical", "planner -> worker -> critic", runtime={"strategy": "plan_execute", "critic_rounds": 2}, budget=BASE.budget),
     "defective": Arm("defective", "policy that skips the mandatory computation step (guardrail target)", profile={"skip_verification": True}, budget=BASE.budget),
     "noisy": Arm("noisy", "policy that emits malformed arguments", profile={"malformed_rate": 0.35}, budget=BASE.budget),

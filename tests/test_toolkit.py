@@ -41,7 +41,7 @@ def by_enum(tier: Tier, note: str = "") -> str:
         tier: customer tier.
         note: free text.
     """
-    return tier.value + note
+    return f"{tier}|{note}"
 
 
 def param(tool_: Tool, name: str) -> Param:
@@ -204,12 +204,18 @@ class TestValidateCoercion:
 
     def test_problems_accumulate_instead_of_short_circuiting(self) -> None:
         args, problems = compute.validate({"ticketId": "T1", "amount": "abc"})
-        assert len(problems) >= 3 and args == {}
+        codes = [p.split(":", 1)[0] for p in problems]
+        assert codes.count("unknown_argument") == 1 and codes.count("invalid_type") == 1
+        assert codes.count("missing_required_argument") == 3  # order_id, qty and the failed amount
+        # only the usable values survive: a rejected argument is absent, not guessed
+        assert "amount" not in args and "ticketId" not in args
+        assert args["urgent"] is False  # defaults are still filled in
 
     def test_enum_values_pass_validation_unchanged(self) -> None:
         args, problems = by_enum.validate({"tier": "GOLD"})
         assert problems == [] and args["tier"] == "GOLD"
-        assert by_enum.call(args) == "GOLD"
+        assert by_enum.call(args) == "GOLD|"
+        assert by_enum.validate({"tier": "DIAMOND"})[1][0].startswith("invalid_enum: 'tier'")
 
 
 class TestToolkitDispatch:
@@ -342,7 +348,8 @@ class TestDeskToolSchemas:
         # The desk tools take these as free strings, but the policy engine and the
         # validators are the single source of truth for what is accepted.
         assert set(CLAIM_TYPES) == {"no_reason", "quality", "missing_item", "damaged", "duplicate_charge", "other"}
-        assert "escalated" not in RESOLUTIONS and set(RESOLUTIONS) >= {"refunded", "coupon", "rejected_by_policy"}
+        assert set(RESOLUTIONS) >= {"refunded", "coupon", "escalated", "rejected_by_policy"}
+        assert "refund" not in RESOLUTIONS  # a typo the desk tool would reject at runtime
         assert set(TEAMS) >= {"risk", "logistics", "supervisor"}
         assert kit.get("escalate_ticket") is not None and kit.get("flag_risk").mutating
 

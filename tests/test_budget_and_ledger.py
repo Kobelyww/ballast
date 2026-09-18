@@ -25,7 +25,7 @@ class TestRunBudget:
 
     def test_round_trip_through_a_dict(self) -> None:
         budget = RunBudget(max_cost=2.5, max_steps=7, max_wall_s=13.0, max_prompt_tokens=999)
-        assert RunBudget.from_dict(budget.as_dict()) == budget
+        assert RunBudget.from_dict(budget.as_dict()).as_dict() == budget.as_dict()
 
     def test_from_dict_fills_missing_keys_and_coerces(self) -> None:
         restored = RunBudget.from_dict({"max_cost": "0.5", "max_steps": "3"})

@@ -338,7 +338,11 @@ class Agent:
         signature = f"{tc.name}|{json.dumps(tc.arguments, sort_keys=True, ensure_ascii=False, default=str)}"
         seen = ctx.extra.setdefault("signatures", {})
         seen[signature] = seen.get(signature, 0) + 1
-        if seen[signature] > 2:
+        # A repeated read is wasteful but harmless; a repeated write is how a resumed or
+        # compacted run ends up paying twice. The ceiling is therefore per-effect.
+        tool_ = self.config.toolkit.get(tc.name)
+        ceiling = 2 if (tool_ and tool_.mutating) else 8
+        if seen[signature] > ceiling:
             ctx.rejected_calls += 1
             ctx.emit("loop_guard", name=tc.name, times=seen[signature], arguments=tc.arguments)
             return ToolResult(

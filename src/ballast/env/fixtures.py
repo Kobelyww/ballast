@@ -317,6 +317,29 @@ def scenarios() -> list[Scenario]:
             tags=["bloat"],
         )
     )
+    out.append(
+        Scenario(
+            id="S19_batch_twelve",
+            title="批量处理 12 张工单（长时程）",
+            skill_family="batch",
+            difficulty="expert",
+            brief="把队列里所有 open 工单批量处理掉，这些都是无理由退货或质量问题，签收都在窗口内。",
+            fixture=_f(
+                customers=[customer(f"CC{i}") for i in range(12)],
+                orders=[order(f"SO6600{i:02d}", f"CC{i}", paid=40.0 + 9 * i, shipping=8.0 if i % 3 == 0 else 0.0) for i in range(12)],
+                order_items=[item(f"IC{i}", f"SO6600{i:02d}", sku=f"SKUC-{i}", name=f"批量商品{i}，含配件、说明书与保修条款完整描述文本", price=40.0 + 9 * i) for i in range(12)],
+                shipments=[shipment(f"SO6600{i:02d}", delivered="2026-05-17T12:00:00") for i in range(12)],
+                tickets=[ticket(f"T66{i:02d}", f"CC{i}", f"SO6600{i:02d}", "买错了不想要，无理由退款") for i in range(12)],
+            ),
+            expect={
+                "outcome": "batch",
+                "tickets": [f"T66{i:02d}" for i in range(12)],
+                "ticket_status": "resolved",
+                "hitl": True,
+            },
+            tags=["long_horizon", "bloat"],
+        )
+    )
     # --- holdout slice: never shown to the distiller, only to the promotion gate ---
     out.append(
         Scenario(

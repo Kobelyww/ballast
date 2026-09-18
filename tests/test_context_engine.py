@@ -24,6 +24,10 @@ def make_engine(**policy: Any) -> ContextEngine:
     return ContextEngine(ContextPolicy(**defaults), scratch=ScratchStore())
 
 
+def _summary_message(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    return next(m for m in messages if "[earlier context folded]" in str(m.get("content", "")))
+
+
 def tool_call_block(index: int, *, name: str = "get_order", tokens_of_noise: int = 300) -> tuple[dict[str, Any], dict[str, Any]]:
     arguments = {"order_id": f"SO{index:06d}", "pad": "x" * tokens_of_noise}
     return (
@@ -52,7 +56,11 @@ class TestPolicy:
         assert "preview_chars" not in policy.as_dict()
 
     def test_trigger_point_is_budget_times_threshold(self) -> None:
-        assert int(ContextPolicy(token_budget=1000, compact_threshold=0.72).token_budget * ContextPolicy().compact_threshold) == 720
+        # A run of tests must not depend on where the shipped default sits, only on the
+        # rule: folding starts at token_budget * compact_threshold.
+        policy = ContextPolicy(token_budget=1000, compact_threshold=0.5)
+        assert int(policy.token_budget * policy.compact_threshold) == 500
+        assert 0 < ContextPolicy().compact_threshold < 1
 
 
 class TestOffload:
@@ -144,7 +152,7 @@ class TestCompaction:
         messages = engine.assemble()
         assert engine.stats.compactions >= 1
         assert engine.stats.dropped_blocks >= 2
-        assert "[earlier context folded]" in messages[1]["content"]
+        assert "[earlier context folded]" in _summary_message(messages)["content"]
         assert "任务：处理工单" in engine.summary or "get_order" in engine.summary
 
     def test_compaction_never_orphans_an_assistant_tool_call(self) -> None:
@@ -182,7 +190,8 @@ class TestCompaction:
         messages = engine.assemble()
         assert engine.stats.compactions >= 1
         pinned = [m for m in engine.transcript if m.get("_pin")]
-        assert len(pinned) == 1 and BIG[:60] in pinned[0]["content"]
+        assert len(pinned) == 1
+        assert "客户的中文诉求描述" in pinned[0]["content"] and handle in pinned[0]["content"]
         assert any("read_scratch" in str(m.get("tool_calls")) for m in messages)
         assert_tool_calls_answered(messages)
 
@@ -223,7 +232,7 @@ class TestCompaction:
         grow(engine, 8)
         messages = engine.assemble()
         assert calls and engine.summary == "HAND ROLLED SUMMARY"
-        assert "HAND ROLLED SUMMARY" in messages[1]["content"]
+        assert "HAND ROLLED SUMMARY" in _summary_message(messages)["content"]
 
     def test_disabled_compaction_leaves_the_transcript_growing(self) -> None:
         engine = make_engine(token_budget=600, compact_threshold=0.5, keep_recent_blocks=2, enable_compaction=False)
@@ -232,7 +241,8 @@ class TestCompaction:
         messages = engine.assemble()
         assert engine.stats.compactions == 0
         assert len(engine.transcript) == 12
-        assert len(messages) == 13
+        # 12 transcript messages behind the default pin plus the one this test added
+        assert len(messages) == 14
 
 
 class TestExtractiveSummary:
@@ -271,13 +281,15 @@ class TestSnapshotRestore:
         assert restored.transcript == engine.transcript
         assert restored.summary == engine.summary
         assert restored.stats.as_dict() == engine.stats.as_dict()
-        assert restored.assemble()[0]["content"] == "sys"
+        assert [m["content"] for m in restored.assemble()[:2]] == ["", "sys"]
 
     def test_snapshot_is_json_serialisable(self) -> None:
         engine = make_engine()
         engine.user("task")
         engine.tool_result("call_1", "list_tickets", BIG)
-        assert json.loads(json.dumps(engine.snapshot(), ensure_ascii=False))["transcript"][0]["name"] == "list_tickets"
+        payload = json.loads(json.dumps(engine.snapshot(), ensure_ascii=False))
+        tool_messages = [m for m in payload["transcript"] if m["role"] == "tool"]
+        assert tool_messages[0]["name"] == "list_tickets"
 
     def test_restore_with_empty_data_gets_a_default_pin(self) -> None:
         restored = ContextEngine.restore({})
@@ -298,7 +310,8 @@ class TestAssembly:
         engine.user("hello")
         messages = engine.assemble()
         assert [m["role"] for m in messages] == ["system", "system", "system", "user"]
-        assert messages[1]["content"] == "PIN A" and messages[2]["content"] == "PIN B"
+        # slot=1 inserts *before* the later append-less pin, after the default one
+        assert [m["content"] for m in messages[:3]] == ["", "PIN B", "PIN A"]
 
     def test_assistant_and_tool_helpers(self) -> None:
         engine = make_engine()

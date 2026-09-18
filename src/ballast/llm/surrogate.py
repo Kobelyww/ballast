@@ -477,20 +477,13 @@ class _Transcript:
 
     # ------------------------------------------------------------- identifiers
     def handled_tickets(self) -> set[str]:
-        """Ticket ids this run already closed or escalated successfully."""
+        """Ticket ids this run actually disposed of.
+
+        Only *successful* results count. Trusting the intent to close — rather than the
+        confirmation that it closed — is how a batch run silently skips the tickets whose
+        close-out was rejected.
+        """
         done: set[str] = set()
-        for msg in self.messages:
-            for call in msg.get("tool_calls") or []:
-                fn = call.get("function", {})
-                if str(fn.get("name", "")) not in {"close_ticket", "escalate_ticket"}:
-                    continue
-                try:
-                    args = json.loads(fn.get("arguments") or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                tid = str(args.get("ticket_id", ""))
-                if tid:
-                    done.add(tid)
         for name in ("close_ticket", "escalate_ticket"):
             for row in self._tool_results().get(name) or []:
                 if "error" not in row and row.get("ticket_id"):

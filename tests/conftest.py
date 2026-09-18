@@ -96,10 +96,14 @@ class Harness:
         )
         self.agent = Agent(self.config, world=self.world, kb=self.kb)
 
+    def load(self, script: list[ChatResponse]) -> None:
+        """Swap in a new turn script and rewind the replay cursor."""
+        self.provider.steps = list(script)
+        self.provider.index = 0
+
     def run(self, script: list[ChatResponse] | None = None) -> RunResult:
         if script is not None:
-            self.provider.steps = list(script)
-            self.provider.index = 0
+            self.load(script)
         return self.agent.run(self.scenario.brief, task_id=self.scenario.id, arm=self.ctx.arm, ctx=self.ctx)
 
 

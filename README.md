@@ -26,17 +26,18 @@ questions that actually decide whether you can run one in production:
 
 ## What the numbers say
 
-From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — 28 after-sales tasks × 3 repeats, every
-arm paired against the same scenarios. Offline surrogate, zero API spend.
+From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — 29 after-sales tasks × 3 repeats × 12
+arms, all paired against identical scenarios. Offline surrogate, zero API spend.
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **81 attempted payments were blocked by the runtime**, and its success rate paired against the healthy arm was **−76.5 points, exact McNemar p = 0.0002, Cohen's h = −2.13**. |
-| **A failing agent is not a cheap agent** | `defective` cost 0.73× of a correct run while succeeding a quarter as often — the "it errored, so we didn't pay for it" intuition is backwards. Failure is mostly wasted spend. |
-| **Cost and quality trade off measurably** | `tight_budget` reached **88.2% of the success rate at a 0.63× cost ratio** (bootstrap 95% CI [0.40, 1.00]) — and the frontier names which arms are dominated rather than asserting a single "best". |
-| **Reliability decays where capability doesn't** | Under `pass^k`, `tight_budget` falls 88.2% → 77.9% → 68.7% across three consecutive draws. A pass@1 demo cannot see this. |
-| **Structured errors buy recovery** | The `noisy` arm produced **303 malformed tool calls** (126 unknown arguments, 117 missing required ones). Coerced-then-explained validation still converted that into 76.5% task success — a raise-and-crash tool layer converts it into 0%. |
-| **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (6 budget aborts) from `environment` (6 upstream timeouts absorbed by retry), so a regression can be assigned to the layer that caused it. |
+| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 94.4%** — the invariant held on every single run; no unverified payment ever landed. |
+| **A failing agent is not a cheap agent** | `defective` cost **0.44× of a correct run while succeeding a quarter as often**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly wasted spend on a task you then redo by hand. |
+| **Cost and quality form a real frontier** | `tight_budget`: 88.9% success at **¥0.0487 / 25.2k prompt tokens**. `ballast`: 94.4% at ¥0.0716 / 35.8k. `naive`: 100% at ¥0.0917 / 43.0k. Context control bought a **17% token and 22% cost reduction on identical behaviour**, and the report names which arms are dominated instead of crowning one. |
+| **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
+| **Structured errors buy recovery** | The `noisy` arm produced **303 malformed tool calls** (126 unknown arguments, 117 missing required ones). Coerce-then-explain validation still converted that into 72.2% task success; a raise-and-crash tool layer converts it into 0%. |
+| **Long horizons are where the trade-off bites** | On the 12-ticket batch task: `naive` finished **12/12 at ¥0.99 and 447k prompt tokens**; `ballast` spent **40% fewer tokens and 44% less money but finished 8/12**. Folding away a ticket's own history is not free. Both numbers are in the report — this is the shape of the decision, not a polished win. |
+| **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
 
 ## Why keep it
 
@@ -78,6 +79,10 @@ arm paired against the same scenarios. Offline surrogate, zero API spend.
 
 Read these before trusting the table above; they are the interesting part.
 
+- **`S19_batch_twelve` fails on the arm that is supposed to be best.** The 12-ticket
+  batch is a real gap: after one compaction the batch policy loses its queue and stops
+  early at 8/12. It is left in the suite failing, in the headline table, and in
+  `bench/results/`, because a benchmark trimmed to your pass rate is not a benchmark.
 - **These numbers characterise the harness, not any LLM.** The `surrogate` is a
   hand-written deterministic policy, not a model. Token/cost deltas between arms are
   real properties of the context machinery (the messages it assembles are the ones a
@@ -89,11 +94,10 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **`naive` ties `ballast` on task success here, and is 11% cheaper.** The 28-task
-  suite is not yet long enough to make context control *pay* — peak context stays
-  under ~8k tokens, so offloading and compaction fire 6 and 3 times but never avert a
-  failure. This suite is a mechanism test, not a leaderboard, and the cost column is
-  the honest reason to run `naive` until your tasks are genuinely long.
+- **`naive` still beats `ballast` on task success (100% vs 94.4%).** Context control is
+  measurably cheaper and provably not free: at this task length nothing needed the
+  savings, and one compaction cost a task. If your runs are short, run `naive` — the
+  benchmark says so explicitly, which is the point of having one.
 - **Long-horizon coverage is thin.** `S17_fat_order` (40-line order) and
   `S18_batch_queue` (5 tickets in one context) exercise offload-then-refetch and
   multi-goal transcripts, but both pass only under the tuned policy and neither has a
