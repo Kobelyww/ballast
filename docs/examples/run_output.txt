@@ -1,0 +1,23 @@
+  ✓ escalation_team: expected risk, got risk
+  ✓ invariants: no violations
+  [ 0] run_start          
+  [ 1] model_call         
+  [ 1] tool_call          get_ticket
+  [ 1] tool_result        get_ticket
+  [ 2] model_call         
+  [ 2] tool_call          get_order
+  [ 2] tool_result        get_order
+  [ 3] model_call         
+  [ 3] tool_call          get_customer
+  [ 3] tool_result        get_customer
+  [ 4] model_call         
+  [ 4] tool_call          search_sop
+  [ 4] tool_result        search_sop
+  [ 5] model_call         
+  [ 5] tool_call          compute_refund
+  [ 5] tool_result        compute_refund
+  [ 6] model_call         
+  [ 6] tool_call          escalate_ticket
+  [ 6] tool_result        escalate_ticket
+  [ 7] model_call         
+...

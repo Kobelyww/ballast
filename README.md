@@ -123,6 +123,10 @@ ballast eval --reps 3 --out bench/results/eval.md
 ballast skills distill && ballast skills gate
 ```
 
+Sample output, no key involved: [`run_output.txt`](docs/examples/run_output.txt) (the
+CLI's own trace dump) and [`traces.md`](docs/examples/traces.md) (three graded runs,
+including a ¥1,999 high-risk refund the runtime refused to pay).
+
 Point it at a real model — nothing else changes:
 
 ```bash
