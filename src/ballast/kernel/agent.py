@@ -184,8 +184,9 @@ class Agent:
         ctx.approvals.extend(state.get("approvals", []))
         ctx.guardrail_blocks = int(state.get("guardrail_blocks", 0))
         engine = ContextEngine.restore(state.get("context", {}), policy=self.config.context, scratch=ctx.scratch)
-        ctx.emit("approval_decision", resumed=True, decision=decision, tool=state.get("interrupt", {}).get("tool"))
-        decision_tool = (state.get("interrupt") or {}).get("tool")
+        interrupted = state.get("interrupt") or {}
+        ctx.emit("approval_decision", resumed=True, decision=decision, tool=interrupted.get("tool"))
+        decision_tool = interrupted.get("tool")
         # The human verdict *is* the gate for this run: resolve_approval must answer
         # from it rather than parking the same call again.
         if decision_tool:
@@ -193,9 +194,9 @@ class Agent:
             ctx.hitl_script = {decision_tool: bool(decision.get("approved"))}
             ctx.pending_interrupt = None
         if decision_tool and decision.get("approved") is False:
-            interrupt_args = (state.get("interrupt") or {}).get("args") or {}
+            interrupt_args = interrupted.get("args") or {}
             engine.tool_result(
-                str(state.get("interrupt", {}).get("call_id", "call_0")),
+                str(interrupted.get("call_id") or "call_0"),
                 decision_tool,
                 json.dumps(
                     {
@@ -288,9 +289,11 @@ class Agent:
                     [tc.as_dict() for tc in response.tool_calls],
                 )
                 repeated_only = True
+                executed_calls = [{"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in response.tool_calls]
                 for tc in response.tool_calls:
                     if ctx.pending_interrupt is not None:
                         ctx.pending_interrupt["call_id"] = tc.id
+                        ctx.extra["pending_calls"] = executed_calls
                         raise Interrupt(ctx.pending_interrupt)
                     result = self._execute(ctx, tc)
                     if result is None:  # pragma: no cover - guarded by Interrupt
@@ -309,7 +312,7 @@ class Agent:
                     final_text = final_text or self._bank_partial(ctx)
                     self._checkpoint(ctx, engine, task, status=status, final_text=final_text)
                     break
-                self._checkpoint(ctx, engine, task, status="running", pending_calls=[{"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in response.tool_calls])
+                self._checkpoint(ctx, engine, task, status="running", pending_calls=executed_calls)
 
             else:
                 status = "budget_aborted"
@@ -317,7 +320,7 @@ class Agent:
                 final_text = final_text or self._bank_partial(ctx)
         except Interrupt as exc:
             status = "interrupted"
-            self._checkpoint(ctx, engine, task, status="interrupted", interrupt=exc.payload)
+            self._checkpoint(ctx, engine, task, status="interrupted", interrupt=exc.payload, pending_calls=ctx.extra.get("pending_calls", []))
             return self._result(ctx, engine, status, final_text, exc.payload, "", started)
         except Exception as exc:  # noqa: BLE001 - a run must always close with evidence
             status = "error"
@@ -470,6 +473,7 @@ class Agent:
             "events": ctx.as_dicts()[-40:],
             "idempotent": {k: v.content for k, v in ctx.extra.get("idempotent", {}).items()},
             "interrupt": ctx.pending_interrupt,
+            "pending_calls": ctx.extra.get("pending_calls", []),
             **extra,
         }
         cp.save(ctx.run_id, state, task_id=ctx.task_id, arm=ctx.arm)
