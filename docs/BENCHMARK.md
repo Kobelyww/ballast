@@ -9,11 +9,10 @@ python -m ballast.cli eval \
 ```
 
 648 runs on the current commit, offline surrogate, **zero API calls**. Read
-`README.md#the-honest-limits` first: these characterise the harness, not a language
-model, and the cost ratio between `ballast` and `naive` is inside its own confidence
-interval. To read the long-horizon result, compare the `S19_batch_twelve` row across the
-`ballast`, `no_compaction` and `no_offload` arms — that comparison is what localized the
-bug described in the README.
+`README.md#the-honest-limits` before quoting anything here: these characterise the
+harness, not a language model. The section worth reading first is
+*"Where the savings actually come from"* — the aggregate row and the per-class rows
+disagree, and the disagreement is the useful part.
 
 ---
 
@@ -87,6 +86,22 @@ Paired on identical scenarios against `ballast` (McNemar exact on discordant pai
 | `noisy` vs `ballast` | -0.278 | 0/5 | 0.0625 | -1.11 | 0.73 [0.22, 2.57] |
 | `static_briefing` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 0.99 [0.96, 1.00] |
 | `tight_budget` vs `ballast` | -0.056 | 0/1 | 1.0000 | -0.48 | 0.77 [0.65, 1.00] |
+
+## Where the savings actually come from
+
+Aggregated over every scenario, the reference arm's cost ratio can hide its own sign. Split by scenario class (tags from `env/fixtures.py`) it usually cannot:
+
+| scenario class | n | mean cost ballast | mean cost naive | naive/ballast cost | naive/ballast prompt tokens |
+|---|---:|---:|---:|---|---|
+| all scenarios | 18 | 0.0816 | 0.0917 | 1.12 [0.87, 1.25] | 1.06 [0.85, 1.17] |
+| class: long_horizon | 2 | 0.4950 | 0.6121 | 1.24 (n too small) | 1.17 (n too small) |
+| class: bloat | 4 | 0.2376 | 0.2876 | 1.21 (n too small) | 1.14 (n too small) |
+| class: restraint | 4 | 0.0194 | 0.0184 | 0.95 (n too small) | 0.86 (n too small) |
+| class: flaky | 1 | 0.0315 | 0.0300 | 0.95 (n too small) | 0.87 (n too small) |
+| class: retrieval | 1 | 0.0986 | 0.0786 | 0.80 (n too small) | 0.87 (n too small) |
+| ordinary (no special tag) | 8 | 0.0227 | 0.0217 | 0.95 [0.95, 0.96] | 0.88 [0.87, 0.89] |
+
+_A ratio above 1.00 with a lower bound above 1.00 means the uncontrolled arm is **reliably more expensive** on that class; a CI spanning 1.00 means the suite cannot tell. Read the classes, not just the aggregate._
 
 ## Where failures come from
 

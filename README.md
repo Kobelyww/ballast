@@ -34,7 +34,7 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 |---|---|
 | **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 100%** — paired Δ −77.8 points, exact McNemar **p = 0.0001**, Cohen's h = −2.16. The invariant held on every single run; no unverified payment ever landed. |
 | **A failing agent is not a cheap agent** | `defective` spent **0.45× of a correct run while succeeding a fifth as often**, and its pass^1→pass^3 collapses 22.2% → 4.9% → 1.1%. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
-| **The controlled arm now dominates the uncontrolled one** | `ballast` and `naive` both finish **100% of the 29 tasks**, at ¥0.0816 / 40.6k prompt tokens vs ¥0.0917 / 43.0k — the same work for ~11% less. `tight_budget` buys a further **0.77× cost ratio [0.65, 1.00]** for one lost task (94.4%). The report lists which arms are dominated instead of crowning a winner. |
+| **The suite is sensitive enough to reverse its own headline** | Aggregated, `ballast` and `naive` both finish **100% of the 29 tasks** and naive costs 1.12× as much — but that CI [0.87, 1.25] spans 1.00, so the honest verdict is "probably cheaper, not proven". Split by scenario class it *does* resolve: context control is **~1.2× cheaper on long-horizon and bloated-payload tasks** and **~0.95× — i.e. more expensive — on ordinary short ones**, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
 | **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
 | **Structured errors buy recovery** | The `noisy` arm produced **279 agent faults from malformed calls** (114 unknown arguments, 102 missing required ones, 63 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success** (Δ −27.8 points, p = 0.063) — a raise-and-crash tool layer converts it into 0%. |
 | **Long horizons found us a real bug, and the arms localized it** | On the 12-ticket batch, `ballast` initially finished **8/12** while `naive` finished 12/12. Disabling *only* compaction recovered all 12; disabling *only* offloading changed nothing — which pointed straight at compaction folding away (a) the task instruction and (b) the record of which tickets were already closed. See below. |
@@ -102,11 +102,15 @@ invisible.
 
 Read these before trusting the table above; they are the interesting part.
 
-- **The 11% cost saving is inside the noise at this suite size.** `naive` / `ballast`
-  paired cost ratio is 1.12 with a bootstrap CI of [0.87, 1.25] — the point estimate
-  favours context control, the interval cannot resolve a saving that small over 29
-  tasks, and S19's 450k-token spread dominates it. Say "not worse, probably cheaper"
-  rather than "cheaper", until the suite is bigger.
+- **The aggregate saving is not yet a proven saving.** Paired naive/ballast cost ratio is
+  1.12 with a bootstrap CI of [0.87, 1.25]. The point estimate favours context control;
+  29 tasks cannot prove it, and a single headline built from that would be marketing.
+  The class breakdown is better powered because it stops mixing a 450k-token batch run
+  with 2k-token lookups — but it is still only 17-24 paired tasks, and the report
+  suppresses intervals below five rather than printing confident-looking noise.
+- **Short tasks are cheaper without any of this.** On ordinary scenarios the controlled
+  arm costs about 5% *more*. If your agent handles one ticket per context window, run
+  `naive`; the benchmark is what tells you which world you are in.
 - **Everything passes except the arms designed to fail.** A suite that the healthy arm
   scores 100% on is a mechanism test, not a difficulty ceiling: the discriminating
   signal here comes from the deliberately defective arms and from cost, not from task
@@ -141,7 +145,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 474 tests, 2.2 seconds, no API key, no network
+make test     # 568 tests, ~12 seconds, no API key, no network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
