@@ -14,3 +14,4 @@ runs/
 .env
 .DS_Store
 bench/results/*.json.tmp
+bench/results/ci-eval.*

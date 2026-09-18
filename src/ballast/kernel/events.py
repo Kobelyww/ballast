@@ -65,6 +65,10 @@ class RunContext:
     hitl_mode: HitlMode = "auto_approve"
     hitl_script: dict[str, bool] = field(default_factory=dict)
     computed: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Progress the transcript is not allowed to be the only copy of: once compaction
+    # folds away "I already closed T6603", an agent that trusts its own window will
+    # happily close it again.
+    progress: dict[str, list[str]] = field(default_factory=lambda: {"closed": [], "escalated": [], "refunded": [], "couponed": []})
     approvals: list[dict[str, Any]] = field(default_factory=list)
     guardrail_blocks: int = 0
     rejected_calls: int = 0

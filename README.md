@@ -32,13 +32,35 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 94.4%** — the invariant held on every single run; no unverified payment ever landed. |
-| **A failing agent is not a cheap agent** | `defective` cost **0.44× of a correct run while succeeding a quarter as often**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly wasted spend on a task you then redo by hand. |
-| **Cost and quality form a real frontier** | `tight_budget`: 88.9% success at **¥0.0487 / 25.2k prompt tokens**. `ballast`: 94.4% at ¥0.0716 / 35.8k. `naive`: 100% at ¥0.0917 / 43.0k. Context control bought a **17% token and 22% cost reduction on identical behaviour**, and the report names which arms are dominated instead of crowning one. |
+| **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 100%** — paired Δ −77.8 points, exact McNemar **p = 0.0001**, Cohen's h = −2.16. The invariant held on every single run; no unverified payment ever landed. |
+| **A failing agent is not a cheap agent** | `defective` spent **0.45× of a correct run while succeeding a fifth as often**, and its pass^1→pass^3 collapses 22.2% → 4.9% → 1.1%. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
+| **The controlled arm now dominates the uncontrolled one** | `ballast` and `naive` both finish **100% of the 29 tasks**, at ¥0.0816 / 40.6k prompt tokens vs ¥0.0917 / 43.0k — the same work for ~11% less. `tight_budget` buys a further **0.77× cost ratio [0.65, 1.00]** for one lost task (94.4%). The report lists which arms are dominated instead of crowning a winner. |
 | **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
-| **Structured errors buy recovery** | The `noisy` arm produced **249 agent faults from malformed calls** (105 unknown arguments, 96 missing required ones, 48 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success at 0.49× the token spend of naive** — a raise-and-crash tool layer converts it into 0%. |
-| **Long horizons are where the trade-off bites — and the harness names the mechanism** | On the 12-ticket batch: `naive` finished **12/12 at ¥0.99 / 447k prompt tokens**, `ballast` spent **41% fewer tokens and 44% less money but finished 8/12**. Turning *only* compaction off recovers all 12 at +73% tokens on that scenario, while turning only offloading off changes nothing — so the cost is attributable to folding history away, not to handle-based offloading. That is the kind of sentence a pass-rate-only benchmark can never produce. |
+| **Structured errors buy recovery** | The `noisy` arm produced **279 agent faults from malformed calls** (114 unknown arguments, 102 missing required ones, 63 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success** (Δ −27.8 points, p = 0.063) — a raise-and-crash tool layer converts it into 0%. |
+| **Long horizons found us a real bug, and the arms localized it** | On the 12-ticket batch, `ballast` initially finished **8/12** while `naive` finished 12/12. Disabling *only* compaction recovered all 12; disabling *only* offloading changed nothing — which pointed straight at compaction folding away (a) the task instruction and (b) the record of which tickets were already closed. See below. |
 | **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
+
+## The bug this benchmark found in itself
+
+`S19_batch_twelve` — close a queue of 12 tickets in one transcript — passed on the
+uncontrolled arm and failed on the tuned one. The ablation matrix localized it: the
+`no_compaction` arm recovered the task, the `no_offload` arm did not budge. Two causes,
+both real and both common:
+
+1. **Compaction folded away the task instruction itself.** After one fold the agent's
+   window contained a *digest of being asked* instead of the request, so a batch run
+   forgot it was a batch run and stopped. Fix: the opening user message is pinned.
+2. **Progress lived only in the transcript.** Once the `close_ticket` results for
+   tickets 1-8 were summarized out, the agent re-opened a ticket it had already closed.
+   Fix: confirmed effects are mirrored into a runtime-regenerated `[RUN STATE]` block
+   that compaction replaces rather than folds, so "already done" is never remembered by
+   the model.
+
+After both: `ballast` finishes **12/12 at 366k prompt tokens / ¥0.76** where `naive`
+needed **452k / ¥1.00** — the controlled arm now wins the hardest task instead of
+losing it. That turnaround is the argument for the whole project: without paired arms
+this reads as "our agent is sometimes flaky on long tasks", and the two-line cause stays
+invisible.
 
 ## Why keep it
 
@@ -80,12 +102,15 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 
 Read these before trusting the table above; they are the interesting part.
 
-- **`S19_batch_twelve` fails on the tuned arm and passes on the dumb one.** After one
-  compaction the batch run loses sight of its queue and stops at 8/12. The diagnosis is
-  a hypothesis from event streams, not a proof; the fix (re-read the queue from the
-  world, which still holds it) is obvious and unwritten. The task stays in the suite,
-  failing, in the headline table and in `bench/results/`, because a benchmark trimmed to
-  your pass rate is not a benchmark.
+- **The 11% cost saving is inside the noise at this suite size.** `naive` / `ballast`
+  paired cost ratio is 1.12 with a bootstrap CI of [0.87, 1.25] — the point estimate
+  favours context control, the interval cannot resolve a saving that small over 29
+  tasks, and S19's 450k-token spread dominates it. Say "not worse, probably cheaper"
+  rather than "cheaper", until the suite is bigger.
+- **Everything passes except the arms designed to fail.** A suite that the healthy arm
+  scores 100% on is a mechanism test, not a difficulty ceiling: the discriminating
+  signal here comes from the deliberately defective arms and from cost, not from task
+  failures. Harder tasks are the main thing this project needs from other people.
 - **These numbers characterise the harness, not any LLM.** The `surrogate` is a
   hand-written deterministic policy, not a model. Token/cost deltas between arms are
   real properties of the context machinery (the messages it assembles are the ones a
@@ -116,6 +141,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
+make test     # 474 tests, 2.2 seconds, no API key, no network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace

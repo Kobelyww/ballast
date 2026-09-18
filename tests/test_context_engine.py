@@ -189,9 +189,12 @@ class TestCompaction:
         grow(engine, 6)
         messages = engine.assemble()
         assert engine.stats.compactions >= 1
+        # two pinned messages survive: the opening task (pinned by `user()`) and the
+        # re-fetched read_scratch block
         pinned = [m for m in engine.transcript if m.get("_pin")]
-        assert len(pinned) == 1
-        assert "客户的中文诉求描述" in pinned[0]["content"] and handle in pinned[0]["content"]
+        assert {m["role"] for m in pinned} == {"user", "tool"}
+        refetch = next(m for m in pinned if m["role"] == "tool")
+        assert "客户的中文诉求描述" in refetch["content"] and handle in refetch["content"]
         assert any("read_scratch" in str(m.get("tool_calls")) for m in messages)
         assert_tool_calls_answered(messages)
 

@@ -1,28 +1,31 @@
-_generated 2026-09-19T03:46:33 · provider `surrogate` · 102 runs over 3 arms_
+_generated 2026-09-19T04:48:58 · provider `surrogate` · 144 runs over 4 arms_
 
 ## Headline
 
 | arm | success | 95% CI | mean cost | mean prompt tok | peak ctx | calls | offloads | compactions | guardrails |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| `naive` | 100.0% (34/34) | [89.8%, 100.0%] | 0.0389 | 19214 | 6405 | 9.9 | 0 | 0 | 2 |
-| `ballast` | 88.2% (30/34) | [73.4%, 95.3%] | 0.0459 | 24989 | 8025 | 10.9 | 40 | 10 | 2 |
-| `defective` | 23.5% (8/34) | [12.4%, 40.0%] | 0.0386 | 21105 | 8025 | 9.9 | 40 | 8 | 54 |
+| `naive` | 100.0% (36/36) | [90.4%, 100.0%] | 0.0917 | 43007 | 10203 | 13.1 | 0 | 0 | 2 |
+| `ballast` | 100.0% (36/36) | [90.4%, 100.0%] | 0.0816 | 40569 | 7775 | 13.3 | 4 | 4 | 2 |
+| `defective` | 22.2% (8/36) | [11.7%, 38.1%] | 0.0370 | 19773 | 8279 | 8.9 | 6 | 8 | 58 |
+| `tight_budget` | 94.4% (34/36) | [81.9%, 98.5%] | 0.0628 | 33084 | 7775 | 12.6 | 4 | 38 | 2 |
 
 ## Reliability (pass^k on repeat draws)
 
 | arm | pass^1 | pass^2 | pass^3 |
 |---|---:|---:|---:|
 | `naive` | 100.0% | 100.0% | 100.0% |
-| `ballast` | 88.2% | 77.9% | 68.7% |
-| `defective` | 23.5% | 5.5% | 1.3% |
+| `ballast` | 100.0% | 100.0% | 100.0% |
+| `defective` | 22.2% | 4.9% | 1.1% |
+| `tight_budget` | 94.4% | 89.2% | 84.2% |
 
 ## Cost / quality frontier
 
 | arm | mean cost | success | dominates |
 |---|---:|---:|---|
-| `naive` | 0.0389 | 100.0% | `ballast` |
-| `ballast` | 0.0459 | 88.2% | — |
-| `defective` | 0.0386 | 23.5% | — |
+| `naive` | 0.0917 | 100.0% | — |
+| `ballast` | 0.0816 | 100.0% | `naive` |
+| `defective` | 0.0370 | 22.2% | — |
+| `tight_budget` | 0.0628 | 94.4% | — |
 
 ## Paired comparisons vs reference arm
 
@@ -30,35 +33,38 @@ Paired on identical scenarios against `ballast` (McNemar exact on discordant pai
 
 | comparison | Δ success | discordant b/c | p (exact) | effect h | cost ratio [95% CI] |
 |---|---:|---|---:|---:|---|
-| `naive` vs `ballast` | +0.118 | 2/0 | 0.5000 | +0.70 | 0.85 [0.68, 1.04] |
-| `defective` vs `ballast` | -0.647 | 0/11 | 0.0010 | -1.43 | 0.84 [0.62, 1.02] |
+| `naive` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.12 [0.87, 1.25] |
+| `defective` vs `ballast` | -0.778 | 0/14 | 0.0001 | -2.16 | 0.45 [0.18, 1.39] |
+| `tight_budget` vs `ballast` | -0.056 | 0/1 | 1.0000 | -0.48 | 0.77 [0.65, 1.00] |
 
 ## Where failures come from
 
 | arm | agent faults | runtime faults | environment faults | top codes |
 |---|---:|---:|---:|---|
-| `naive` | 12 | 0 | 4 | loop_detected×12, upstream_timeout×4 |
-| `ballast` | 6 | 0 | 4 | loop_detected×6, upstream_timeout×4 |
-| `defective` | 4 | 0 | 2 | loop_detected×4, upstream_timeout×2 |
+| `naive` | 24 | 0 | 4 | loop_detected×24, upstream_timeout×4 |
+| `ballast` | 24 | 0 | 4 | loop_detected×24, upstream_timeout×4 |
+| `defective` | 2 | 0 | 2 | upstream_timeout×2, loop_detected×2 |
+| `tight_budget` | 28 | 2 | 4 | loop_detected×28, upstream_timeout×4, budget_exhausted×2 |
 
 ## Per-scenario outcome
 
-| scenario | `naive` | `ballast` | `defective` |
-|---|---|---|---|
-| S01_inwindow_refund | ✅ | ✅ | ❌ |
-| S02_window_closed | ✅ | ✅ | ❌ |
-| S03_quality_with_shipping | ✅ | ✅ | ❌ |
-| S04_missing_item | ✅ | ✅ | ❌ |
-| S05_non_returnable | ✅ | ✅ | ❌ |
-| S06_high_risk | ✅ | ✅ | ❌ |
-| S07_approval_line | ✅ | ✅ | ❌ |
-| S08_address_change | ✅ | ✅ | ✅ |
-| S09_address_locked | ✅ | ✅ | ✅ |
-| S10_phone_lookup | ✅ | ✅ | ❌ |
-| S12_coupon_within_cap | ✅ | ✅ | ✅ |
-| S13_coupon_over_cap | ✅ | ✅ | ✅ |
-| S14_flaky_upstream | ✅ | ✅ | ❌ |
-| S15_context_bloat | ✅ | ✅ | ❌ |
-| S16_queue_dig | ✅ | ✅ | ❌ |
-| S17_fat_order | ✅ | ❌ | ❌ |
-| S18_batch_queue | ✅ | ❌ | ❌ |
+| scenario | `naive` | `ballast` | `defective` | `tight_budget` |
+|---|---|---|---|---|
+| S01_inwindow_refund | ✅ | ✅ | ❌ | ✅ |
+| S02_window_closed | ✅ | ✅ | ❌ | ✅ |
+| S03_quality_with_shipping | ✅ | ✅ | ❌ | ✅ |
+| S04_missing_item | ✅ | ✅ | ❌ | ✅ |
+| S05_non_returnable | ✅ | ✅ | ❌ | ✅ |
+| S06_high_risk | ✅ | ✅ | ❌ | ✅ |
+| S07_approval_line | ✅ | ✅ | ❌ | ✅ |
+| S08_address_change | ✅ | ✅ | ✅ | ✅ |
+| S09_address_locked | ✅ | ✅ | ✅ | ✅ |
+| S10_phone_lookup | ✅ | ✅ | ❌ | ✅ |
+| S12_coupon_within_cap | ✅ | ✅ | ✅ | ✅ |
+| S13_coupon_over_cap | ✅ | ✅ | ✅ | ✅ |
+| S14_flaky_upstream | ✅ | ✅ | ❌ | ✅ |
+| S15_context_bloat | ✅ | ✅ | ❌ | ✅ |
+| S16_queue_dig | ✅ | ✅ | ❌ | ✅ |
+| S17_fat_order | ✅ | ✅ | ❌ | ✅ |
+| S18_batch_queue | ✅ | ✅ | ❌ | ✅ |
+| S19_batch_twelve | ✅ | ✅ | ❌ | ❌ |

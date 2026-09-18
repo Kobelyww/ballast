@@ -493,6 +493,17 @@ class _Transcript:
             for row in self._tool_results().get(name) or []:
                 if "error" not in row and row.get("ticket_id"):
                     done.add(str(row["ticket_id"]))
+        # The runtime's pinned state block outranks the transcript: a folded-away
+        # confirmation is still a confirmation.
+        for msg in self.messages:
+            if msg.get("role") != "system":
+                continue
+            content = str(msg.get("content", ""))
+            if "RUN STATE" not in content:
+                continue
+            for key in ("tickets_closed", "tickets_escalated"):
+                line = next((ln for ln in content.splitlines() if ln.startswith(key + ":")), "")
+                done.update(t for t in line.split(":", 1)[1].strip().split(", ") if t and t != "none")
         return done
 
     def first_seen_ticket(self) -> str | None:
@@ -525,6 +536,10 @@ class _Transcript:
         blob = self.brief() + " " + str(self.ticket_field("claim") or "")
         ticket = None
         for msg in self.messages:
+            # Only the user's own words name the target; a digest of earlier turns can
+            # mention a ticket that is already finished.
+            if msg.get("role") != "user":
+                continue
             match = _TICKET_RE.search(str(msg.get("content", "")))
             if match:
                 ticket = match.group(1)

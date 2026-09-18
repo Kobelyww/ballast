@@ -29,6 +29,7 @@ from ..context.engine import ContextEngine, ContextPolicy
 from ..llm.base import ChatRequest, ChatResponse, Pricing, Provider, Usage, user_message
 from ..support.text import ScratchStore, estimate_request_tokens
 from .budget import BudgetExceeded, RunBudget, UsageLedger
+from ..context.engine import STATE_HEADER
 from .events import HitlMode, RunContext
 from .hitl import Interrupt
 from .toolkit import Tool, ToolResult, Toolkit
@@ -155,6 +156,7 @@ class Agent:
         engine.pin(self._system_prompt())
         brief = self._briefing(task, ctx)
         engine.pin(brief, slot=len(engine.pins))
+        engine.set_state_block(self._state_block(ctx))
         engine.user(task)
         ctx.emit("run_start", task_id=task_id, arm=arm, strategy=self.config.strategy, prompt_tokens=estimate_request_tokens(engine.assemble()))
         return self._loop(ctx, engine, task)
@@ -305,6 +307,7 @@ class Agent:
                         repair_attempts += 1
                 # A step where *every* call was already made verbatim means the model is
                 # spinning, not repairing. Two of those and the run is closed out.
+                engine.set_state_block(self._state_block(ctx))
                 stall = 0 if not repeated_only else stall + 1
                 if stall >= 2:
                     status = "stalled"
@@ -330,6 +333,25 @@ class Agent:
             ctx.emit("error", detail=str(exc)[:400])
         self._checkpoint(ctx, engine, task, status=status, final_text=final_text)
         return self._result(ctx, engine, status, final_text, None, error, started)
+
+    def _record_progress(self, ctx: RunContext, name: str, args: dict[str, Any]) -> None:
+        bucket = {"close_ticket": "closed", "escalate_ticket": "escalated", "issue_refund": "refunded", "send_coupon": "couponed"}.get(name)
+        if bucket is None:
+            return
+        value = str(args.get("ticket_id") or args.get("order_id") or args.get("customer_id") or "")
+        if value and value not in ctx.progress[bucket]:
+            ctx.progress[bucket].append(value)
+
+    def _state_block(self, ctx: RunContext) -> str:
+        progress = ctx.progress
+        lines = [STATE_HEADER]
+        lines.append(f"tickets_closed: {', '.join(progress['closed']) or 'none'}")
+        lines.append(f"tickets_escalated: {', '.join(progress['escalated']) or 'none'}")
+        lines.append(f"orders_refunded: {', '.join(progress['refunded']) or 'none'}")
+        if ctx.computed:
+            lines.append(f"policy_computations: {len(ctx.computed)}")
+        lines.append("These are facts the runtime confirmed, not guesses. Do not redo work listed here.")
+        return "\n".join(lines)
 
     def _execute(self, ctx: RunContext, tc: Any) -> Any:
         """Dispatch with resume-safety: a call already executed under this run replays."""
@@ -425,7 +447,7 @@ class Agent:
             return "stop"
         ctx.critic_rounds += 1
         ctx.emit("critic", findings=[f.as_dict() for f in found], round=ctx.critic_rounds)
-        engine.user(CRITIC_TEMPLATE.format(findings="\n".join(f"- {f.as_instruction()}" for f in found[:6])))
+        engine.add({"role": "user", "content": CRITIC_TEMPLATE.format(findings="\n".join(f"- {f.as_instruction()}" for f in found[:6]))})
         return "continue"
 
     def _bank_partial(self, ctx: RunContext) -> str:

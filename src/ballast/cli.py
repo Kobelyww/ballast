@@ -229,8 +229,11 @@ def _cmd_skills(args: argparse.Namespace, data: Path) -> int:
         return 1
     verdicts = gate_library(candidates=candidates, library=library, baseline_arm=args.baseline_arm)
     print(json.dumps([v.as_dict() for v in verdicts], ensure_ascii=False, indent=2))
-    print(apply_verdicts(library, verdicts))
-    return 0
+    counts = apply_verdicts(library, verdicts)
+    print(f"GATE candidates={len(verdicts)} promoted={counts['promoted']} retired={counts['retired']}")
+    # Nothing surviving the gate when cards were produced means retrieval or grading
+    # silently stopped working, which is exactly what CI is here to catch.
+    return 0 if counts["promoted"] else 1
 
 
 __all__ = ["Pricing", "Skill", "main"]
