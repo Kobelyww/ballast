@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
 
     eval_p = sub.add_parser("eval", help="run the suite across arms")
     eval_p.add_argument("--arms", default="naive,ballast,no_context_control,tight_budget,defective,noisy,bloated")
-    eval_p.add_argument("--suite", default="train", choices=["train", "holdout", "all"])
+    eval_p.add_argument("--suite", default="train", choices=["train", "holdout", "ops", "ops_train", "ops_holdout", "all"])
     eval_p.add_argument("--reps", type=int, default=1)
     eval_p.add_argument("--workers", type=int, default=4)
     eval_p.add_argument("--provider", default="surrogate")
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
 
     skills_p = sub.add_parser("skills", help="distill, gate and list skill cards")
     skills_p.add_argument("action", nargs="?", default="list", choices=["list", "distill", "gate"])
-    skills_p.add_argument("--suite", default="train", choices=["train", "holdout", "all"])
+    skills_p.add_argument("--suite", default="train", choices=["train", "holdout", "ops", "ops_train", "ops_holdout", "all"])
     skills_p.add_argument("--baseline-arm", default="defective")
 
     args = parser.parse_args(argv)

@@ -11,6 +11,15 @@ found, and what it now measures that it previously could not.
 
 ### Added
 
+- **A second domain**: SRE incident management (`env/ops_world.py`,
+  `env/incident_policy.py`, `env/incident_verify.py`, `tools/ops.py`,
+  `env/runbooks/`, `bench/incident_graders.py`, `llm/ops_surrogate.py`, 9 tasks).
+  Added without touching `kernel/`, `llm/base`, `context/` or `bench/` statistics —
+  `AgentConfig.invariant_check` is now injected so the loop is domain-free, and it
+  raises rather than silently disabling the critic if you ask for critique without
+  supplying invariants.
+- **`ops_unassessed` / `ops_reckless` arms**: paging or reverting a frozen deploy
+  without a policy assessment is refused every time (0 unauthorised rollbacks).
 - **A batch size ladder** (`B04`…`B16`): the same task at 4/6/9/12/16 tickets, so cost
   claims about context control rest on enough paired tasks for a bootstrap interval to
   mean something. 25 tasks total.

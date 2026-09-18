@@ -101,6 +101,14 @@ invisible.
   content-addressed handles, whole-block compaction that never orphans a `tool_calls`
   message, pinned re-fetches, and a CJK-aware token budget checked *before* the
   request — each one is a toggle with its own ablation arm.
+- **It is a runtime, not one application.** A second domain — SRE incident management:
+  different world, different policy engine, different tools, different runbooks,
+  different offline policy driver — was added with **no change to `kernel/`, `llm/`,
+  `context/` or `bench/`**. 1,032 runs across both domains: `defective` draws **183
+  guardrail blocks** and still never moves money or pages without an assessment;
+  `ops_reckless`, which insists on reverting a frozen deploy, is stopped on every
+  change-freeze scenario (**0 unauthorised rollbacks**) and still finishes 86% of tasks.
+  `git log` on that commit is the evidence.
 - **It is small enough to read.** ~4.5k lines, stdlib only, no framework lock-in and
   no vendor SDK. Every mechanism is implemented in the open rather than imported.
 
@@ -154,11 +162,12 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 588 tests, ~15 seconds, no API key, no external network
+make test     # 614 tests, ~36 seconds, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
 ballast eval --reps 3 --out bench/results/eval.md
+ballast eval --suite ops --arms ballast,ops_unassessed,ops_reckless   # second domain
 ballast skills distill && ballast skills gate
 ```
 

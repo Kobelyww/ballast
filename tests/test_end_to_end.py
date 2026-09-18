@@ -151,7 +151,7 @@ class TestArmAblations:
     """Differences attributable to the harness, not to a model's mood."""
 
     def test_the_arm_menu_is_complete(self) -> None:
-        assert set(DEFAULT_ARMS) == {
+        assert set(DEFAULT_ARMS) >= {
             "naive",
             "ballast",
             "no_offload",

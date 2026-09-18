@@ -13,6 +13,8 @@ from pathlib import Path
 from ..support.bm25 import BM25Index, Doc, load_markdown_docs
 
 SOP_DIR = Path(__file__).parent / "sop"
+RUNBOOK_DIR = Path(__file__).parent / "runbooks"
+RUNBOOK_DIR = Path(__file__).parent / "runbooks"
 
 
 class KnowledgeBase:
@@ -42,3 +44,8 @@ class KnowledgeBase:
             "\n\n".join(f"[{doc.id}]\n{doc.text}" for doc in self.index.docs),
             max_tokens,
         )
+
+
+def runbook_kb() -> KnowledgeBase:
+    """The on-call corpus. A second domain should cost a directory, not a new class."""
+    return KnowledgeBase.from_dir(RUNBOOK_DIR)

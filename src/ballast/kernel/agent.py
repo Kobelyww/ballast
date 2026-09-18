@@ -82,6 +82,10 @@ class AgentConfig:
     soft_degrade: bool = True
     checkpointer: Any = None
     max_repair_attempts: int = 2
+    # Invariants are a property of the domain, not of the runtime: callable
+    # (world, ctx) -> list[Finding]. Supplied by the caller so the loop never has to
+    # know what a "refund" or a "page" is.
+    invariant_check: Any = None
 
 
 @dataclass(slots=True)
@@ -151,6 +155,12 @@ class Agent:
         ctx.sop = ctx.sop or self.kb
         ctx.hitl_mode = ctx.hitl_mode or self.config.hitl_mode
         ctx.run_id = ctx.run_id or uuid.uuid4().hex[:12]
+        if self.config.critic_rounds > 0 and self.config.invariant_check is None:
+            raise ValueError(
+                "critic_rounds > 0 but invariant_check is None: the critic would silently "
+                "never run. Pass invariant_check (see kernel.verify.audit / "
+                "env.incident_verify.audit) or set critic_rounds=0."
+            )
         self.ledger.set_budget(ctx.run_id, self.config.budget)
         engine = ContextEngine(self.config.context, scratch=ctx.scratch)
         engine.pin(self._system_prompt())
@@ -438,11 +448,13 @@ class Agent:
         return None
 
     def _critique(self, ctx: RunContext, engine: ContextEngine, final_text: str) -> str:
-        from .verify import audit, violations
+        from .verify import violations
 
-        if self.world is None or ctx.critic_rounds >= self.config.critic_rounds:
+        if self.world is None or ctx.critic_rounds >= self.config.critic_rounds or self.config.invariant_check is None:
             return "stop"
-        found = violations(audit(self.world, sop_ids=self.kb.section_ids() if self.kb else None, ticket_id=_ticket_of(ctx.task_id, final_text)))
+        # The check is domain code, but "which record is this run about" is runtime
+        # context, so the run's identity travels with the world.
+        found = violations(self.config.invariant_check(self.world, ctx))
         if not found:
             return "stop"
         ctx.critic_rounds += 1

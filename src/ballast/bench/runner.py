@@ -22,21 +22,26 @@ from typing import Any, Callable
 
 from ..context.engine import ContextPolicy
 from ..env.fixtures import Scenario, apply_faults, scenarios
-from ..env.knowledge import KnowledgeBase
+from ..env.incident_fixtures import apply_faults as apply_ops_faults
+from ..env.knowledge import KnowledgeBase, runbook_kb
 from ..kernel.agent import Agent, AgentConfig
 from ..kernel.budget import RunBudget
 from ..kernel.events import RunContext
+from ..kernel.verify import audit as audit_desk
 from ..kernel.toolkit import Toolkit
 from ..llm.base import Pricing
 from ..llm.cache import ResponseCache
 from ..llm.provider import OpenAICompatProvider
+from ..llm.ops_surrogate import OpsProfile, OpsSurrogatePolicy
 from ..llm.surrogate import ScriptedModel, SurrogatePolicy, SurrogateProfile
 from ..memory.episodic import EpisodeStore, RunRecord
 from ..memory.skills import Skill, SkillLibrary
 from ..support.text import ScratchStore
 from ..tools.desk import build_desk_tools
+from ..tools.ops import build_ops_tools
 from .faults import attribute, summarise
 from .graders import Grade, grade
+from .incident_graders import grade as grade_ops
 
 
 @dataclass(slots=True)
@@ -94,6 +99,8 @@ DEFAULT_ARMS: dict[str, Arm] = {
     "no_budget": Arm("no_budget", "no ceiling: what the same policy costs when nothing stops it", budget={"max_cost": 1e6, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 1_000_000}),
     "hierarchical": Arm("hierarchical", "planner -> worker -> critic", runtime={"strategy": "plan_execute", "critic_rounds": 2}, budget=BASE.budget),
     "defective": Arm("defective", "policy that skips the mandatory computation step (guardrail target)", profile={"skip_verification": True}, budget=BASE.budget),
+    "ops_unassessed": Arm("ops_unassessed", "ops policy that pages and reverts without a policy assessment", profile={"skip_assessment": True}, budget=BASE.budget),
+    "ops_reckless": Arm("ops_reckless", "ops policy that rolls back whatever it likes, ignoring the safety gate", profile={"force_rollback": True}, budget=BASE.budget),
     "noisy": Arm("noisy", "policy that emits malformed arguments", profile={"malformed_rate": 0.35}, budget=BASE.budget),
     "bloated": Arm("bloated", "policy that pulls whole lists instead of one record", profile={"blind_listing": True}, budget=BASE.budget),
 }
@@ -190,10 +197,14 @@ class SuiteResult:
         Path(path).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def make_provider(kind: str = "surrogate", *, profile: SurrogateProfile | None = None, cache_dir: Path | str | None = None, model: str = "deepseek-chat", scripted: ScriptedModel | None = None) -> Any:
+def make_provider(kind: str = "surrogate", *, profile: SurrogateProfile | None = None, cache_dir: Path | str | None = None, model: str = "deepseek-chat", scripted: ScriptedModel | None = None, domain: str = "desk", profile_fields: dict[str, Any] | None = None) -> Any:
     if scripted is not None:
         return scripted
     if kind in ("surrogate", "", None):
+        # Each domain ships its own offline policy driver; the arm's knobs are filtered
+        # to whatever that driver actually accepts.
+        if domain == "ops":
+            return OpsSurrogatePolicy(OpsProfile(**_known(OpsProfile, profile_fields or {})))
         return SurrogatePolicy(profile)
     import os
 
@@ -219,13 +230,25 @@ def run_scenario(
     cache_dir: Path | str | None = None,
     model: str = "deepseek-chat",
 ) -> tuple[RunRecordRow, Grade, dict[str, Any]]:
+    domain = getattr(scenario, "domain", "desk")
+    ops = domain == "ops"
     world = scenario.build_world()
-    apply_faults(scenario, world)
-    kb = kb or KnowledgeBase.from_dir()
-    ctx = RunContext(task_id=scenario.id, arm=arm.name, world=world, sop=kb, hitl_mode="scripted", hitl_script={"issue_refund": bool(scenario.expect.get("hitl"))})
+    (apply_ops_faults if ops else apply_faults)(scenario, world)
+    kb = kb or (runbook_kb() if ops else KnowledgeBase.from_dir())
+    verdicts = {"issue_refund": bool(scenario.expect.get("hitl"))} if not ops else {"page_oncall": True, "rollback_deploy": True}
+    ctx = RunContext(task_id=scenario.id, arm=arm.name, world=world, sop=kb, hitl_mode="scripted", hitl_script=verdicts)
     ctx.scratch = ScratchStore()
-    toolkit = Toolkit(build_desk_tools(ctx))
-    provider = make_provider(provider_kind, profile=SurrogateProfile(**arm.profile) if arm.profile else None, cache_dir=cache_dir, model=model)
+    toolkit = Toolkit(build_ops_tools(ctx) if ops else build_desk_tools(ctx))
+    provider = make_provider(
+        provider_kind,
+        profile=SurrogateProfile(**_known(SurrogateProfile, arm.profile)) if arm.profile else None,
+        cache_dir=cache_dir,
+        model=model,
+        domain=domain,
+        profile_fields=arm.profile,
+    )
+
+    from ..env.incident_verify import audit as audit_ops
 
     runtime = dict(arm.runtime)
     briefing_mode = runtime.pop("briefing_mode", "retrieved")
@@ -236,6 +259,7 @@ def run_scenario(
         context=ContextPolicy(**{**asdict(ContextPolicy()), **arm.context}),
         budget=RunBudget(**{**_BUDGET_DEFAULTS, **_budget_args(arm.budget)}),
         pricing=pricing or Pricing(),
+        invariant_check=(lambda w, c: audit_ops(w)) if ops else (lambda w, c: audit_desk(w, sop_ids=kb.section_ids(), ticket_id=_scoped_ticket(c.task_id))),
         **runtime,
     )
     agent = Agent(config, world=world, kb=kb, skills=skills)
@@ -247,7 +271,7 @@ def run_scenario(
     result = agent.run(scenario.brief, task_id=scenario.id, arm=arm.name, ctx=ctx)
     elapsed = time.monotonic() - started
 
-    g = grade(scenario, world, sop_ids=kb.section_ids(), events=result.events)
+    g = (grade_ops if ops else grade)(scenario, world, sop_ids=kb.section_ids(), events=result.events)
     fault_list = attribute(result.events, steps=result.steps, status=result.status)
     if not g.ok and not fault_list:
         fault_list = attribute(result.events, steps=result.steps, status="no_action")
@@ -278,6 +302,16 @@ def run_scenario(
         skills_applied=result.skills_applied,
     )
     return row, g, {"result": result, "world": world, "agent": agent}
+
+
+def _scoped_ticket(task_id: str) -> str | None:
+    """The desk critic only judges a ticket when the run is named after one."""
+    return task_id if task_id.startswith("T") else None
+
+
+def _known(cls: type, fields: dict[str, Any]) -> dict[str, Any]:
+    allowed = set(getattr(cls, "__dataclass_fields__", {}))
+    return {k: v for k, v in (fields or {}).items() if k in allowed}
 
 
 def _budget_args(budget: dict[str, Any]) -> dict[str, Any]:

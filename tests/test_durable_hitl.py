@@ -45,6 +45,8 @@ def _build(db, *, hitl_mode="interrupt", script=None):
         hitl_mode=hitl_mode,
         hitl_script=script or {},
         checkpointer=Checkpointer(db),
+        # These tests are about parking and resuming, not about the critic.
+        critic_rounds=0,
     )
     return Agent(config, world=world, kb=kb), ctx, scenario
 

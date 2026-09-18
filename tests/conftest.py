@@ -30,7 +30,13 @@ from ballast.env.fixtures import Scenario, by_id, train_slice  # noqa: E402
 from ballast.env.knowledge import KnowledgeBase  # noqa: E402
 from ballast.kernel.agent import Agent, AgentConfig, RunResult  # noqa: E402
 from ballast.kernel.budget import RunBudget  # noqa: E402
-from ballast.kernel.events import RunContext  # noqa: E402
+from ballast.kernel.events import RunContext
+from ballast.kernel.verify import audit as desk_audit  # noqa: E402
+
+
+def _ticket(run_ctx: object) -> str | None:
+    task_id = str(getattr(run_ctx, "task_id", "") or "")
+    return task_id if task_id.startswith("T") else None
 from ballast.kernel.toolkit import Toolkit  # noqa: E402
 from ballast.llm.base import ChatResponse, ToolCall, Usage  # noqa: E402
 from ballast.llm.surrogate import ScriptedModel  # noqa: E402
@@ -92,6 +98,9 @@ class Harness:
             toolkit=Toolkit(build_desk_tools(self.ctx)),
             context=ContextPolicy(**config.pop("context", {})),
             budget=RunBudget(**config.pop("budget", {})),
+            # This harness is desk-only, so the desk invariants are the default here;
+            # production callers wire their own (see bench/runner.run_scenario).
+            invariant_check=config.pop("invariant_check", lambda w, run=None: desk_audit(w, sop_ids=self.kb.section_ids(), ticket_id=_ticket(run))),
             **config,
         )
         self.agent = Agent(self.config, world=self.world, kb=self.kb)
