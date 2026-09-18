@@ -26,8 +26,9 @@ questions that actually decide whether you can run one in production:
 
 ## What the numbers say
 
-From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — 29 after-sales tasks × 3 repeats × 12
-arms, all paired against identical scenarios. Offline surrogate, zero API spend.
+From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — **648 runs**: 29 after-sales tasks × 3
+repeats × 12 runtime arms, every arm paired against identical scenarios. Offline
+surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/examples/traces.md).
 
 | Finding | Evidence |
 |---|---|
@@ -35,8 +36,8 @@ arms, all paired against identical scenarios. Offline surrogate, zero API spend.
 | **A failing agent is not a cheap agent** | `defective` cost **0.44× of a correct run while succeeding a quarter as often**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly wasted spend on a task you then redo by hand. |
 | **Cost and quality form a real frontier** | `tight_budget`: 88.9% success at **¥0.0487 / 25.2k prompt tokens**. `ballast`: 94.4% at ¥0.0716 / 35.8k. `naive`: 100% at ¥0.0917 / 43.0k. Context control bought a **17% token and 22% cost reduction on identical behaviour**, and the report names which arms are dominated instead of crowning one. |
 | **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
-| **Structured errors buy recovery** | The `noisy` arm produced **303 malformed tool calls** (126 unknown arguments, 117 missing required ones). Coerce-then-explain validation still converted that into 72.2% task success; a raise-and-crash tool layer converts it into 0%. |
-| **Long horizons are where the trade-off bites** | On the 12-ticket batch task: `naive` finished **12/12 at ¥0.99 and 447k prompt tokens**; `ballast` spent **40% fewer tokens and 44% less money but finished 8/12**. Folding away a ticket's own history is not free. Both numbers are in the report — this is the shape of the decision, not a polished win. |
+| **Structured errors buy recovery** | The `noisy` arm produced **249 agent faults from malformed calls** (105 unknown arguments, 96 missing required ones, 48 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success at 0.49× the token spend of naive** — a raise-and-crash tool layer converts it into 0%. |
+| **Long horizons are where the trade-off bites — and the harness names the mechanism** | On the 12-ticket batch: `naive` finished **12/12 at ¥0.99 / 447k prompt tokens**, `ballast` spent **41% fewer tokens and 44% less money but finished 8/12**. Turning *only* compaction off recovers all 12 at +73% tokens on that scenario, while turning only offloading off changes nothing — so the cost is attributable to folding history away, not to handle-based offloading. That is the kind of sentence a pass-rate-only benchmark can never produce. |
 | **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
 
 ## Why keep it
@@ -79,10 +80,12 @@ arms, all paired against identical scenarios. Offline surrogate, zero API spend.
 
 Read these before trusting the table above; they are the interesting part.
 
-- **`S19_batch_twelve` fails on the arm that is supposed to be best.** The 12-ticket
-  batch is a real gap: after one compaction the batch policy loses its queue and stops
-  early at 8/12. It is left in the suite failing, in the headline table, and in
-  `bench/results/`, because a benchmark trimmed to your pass rate is not a benchmark.
+- **`S19_batch_twelve` fails on the tuned arm and passes on the dumb one.** After one
+  compaction the batch run loses sight of its queue and stops at 8/12. The diagnosis is
+  a hypothesis from event streams, not a proof; the fix (re-read the queue from the
+  world, which still holds it) is obvious and unwritten. The task stays in the suite,
+  failing, in the headline table and in `bench/results/`, because a benchmark trimmed to
+  your pass rate is not a benchmark.
 - **These numbers characterise the harness, not any LLM.** The `surrogate` is a
   hand-written deterministic policy, not a model. Token/cost deltas between arms are
   real properties of the context machinery (the messages it assembles are the ones a

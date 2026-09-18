@@ -8,10 +8,12 @@ python -m ballast.cli eval \
   --reps 3 --out bench/results/eval.md
 ```
 
-The numbers below were produced by that command on the current commit, with the offline
-surrogate policy and **zero API calls**. Read `README.md#the-honest-limits` first: these
-characterise the harness, not any language model. Note in particular that `naive` beats
-`ballast` on task success and that `S19_batch_twelve` fails on every arm that reaches it.
+648 runs on the current commit, offline surrogate, **zero API calls**. Read
+`README.md#the-honest-limits` before quoting anything here: these characterise the
+harness, not a language model. Two results are deliberately left un-flattering: `naive`
+beats `ballast` on task success, and `S19_batch_twelve` fails on every arm that
+compacts. To attribute the batch failure, compare the `no_compaction` and `no_offload`
+rows for that scenario in the matrix at the bottom.
 
 ---
 

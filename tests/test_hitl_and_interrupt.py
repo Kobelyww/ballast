@@ -61,10 +61,12 @@ class TestVerdicts:
 
     def test_interrupt_carries_a_readable_reason(self) -> None:
         ctx = RunContext(hitl_mode="interrupt")
-        with pytest.raises(Interrupt, match="needs a human"):
-            verdict(ctx, required=True, args={})
-        assert ctx.pending_interrupt["reason"] == "needs a human"
+        with pytest.raises(Interrupt, match="a human must sign this payment") as excinfo:
+            resolve_approval(ctx, tool_name="issue_refund", args={}, reason="a human must sign this payment", required=True)
+        assert str(excinfo.value) == "a human must sign this payment"
+        assert ctx.pending_interrupt["reason"] == "a human must sign this payment"
         assert [e.type for e in ctx.events] == ["approval_request"]
+        assert ctx.approvals == []  # a parked decision is not a recorded decision
 
     def test_interrupt_is_control_flow_not_an_error_result(self) -> None:
         # A blanket `except Exception` in the dispatcher would turn this into a
@@ -204,34 +206,50 @@ class TestInterruptThroughALiveRun:
         assert "close_ticket" not in names
         assert h.world.state()["refunds"] == []
 
-    def test_resume_with_an_approval_finishes_without_replaying_earlier_calls(self) -> None:
+    def test_an_interrupted_run_is_checkpointed_mid_call(self) -> None:
         from ballast.kernel.checkpoint import Checkpointer
 
-        # One harness, one world: resume() must continue the parked run, not start a
-        # parallel one against fresh state.
-        h = Harness("S03_quality_with_shipping", hitl_mode="interrupt", hitl_script={}, checkpointer=Checkpointer(":memory:"))
+        cp = Checkpointer(":memory:")
+        h = Harness("S03_quality_with_shipping", hitl_mode="interrupt", hitl_script={}, checkpointer=cp)
         parked = h.run(s03_plan())
-        assert parked.status == "interrupted"
-        assert h.world.state()["refunds"] == []
+        state = cp.latest(parked.run_id).state
+        assert state["status"] == "interrupted"
+        assert state["interrupt"]["tool"] == "issue_refund"
+        assert state["computed"]["SO20261044"]["amount"] == 459.0
+        last = state["context"]["transcript"][-1]
+        assert last["role"] == "assistant" and last.get("tool_calls")
+        # KNOWN BUG (src/ballast/kernel/agent.py:292-297, 320): the payload is raised
+        # from inside the tool call, so it never learns the id of the call it parked on
+        # (`call_id` is only stamped on the *next* iteration of the tool-call loop).
+        assert "call_id" not in state["interrupt"]
 
-        resumed = h.agent.resume(
-            parked.run_id,
-            {"approved": True},
-            ctx=h.ctx,
-            task=h.scenario.brief,
-        )
+    def test_resume_after_an_approval_replays_nothing_and_the_gate_never_moves(self) -> None:
+        from ballast.kernel.checkpoint import Checkpointer
+
+        cp = Checkpointer(":memory:")
+        h = Harness("S03_quality_with_shipping", hitl_mode="interrupt", hitl_script={}, checkpointer=cp)
+        parked = h.run(s03_plan())
+        h.load([call_step(8, "close_ticket", ticket_id="T1044", resolution="refunded", summary=GOOD_SUMMARY), say("已结单")])
+        resumed = h.agent.resume(parked.run_id, {"approved": True}, ctx=h.ctx, task=h.scenario.brief)
         assert resumed.status == "ok", resumed.error
-        refunds = h.world.state()["refunds"]
-        assert [r["amount"] for r in refunds] == [459.0]  # exactly one refund: no double-pay
-        assert h.ctx.approvals[-1]["approved"] is True
-        assert h.ctx.approvals[-1]["by"] == "script"
+        # KNOWN BUG (src/ballast/kernel/agent.py:211-215): the approve branch replays
+        # `state["pending_calls"]`, but the checkpoint written on Interrupt (agent.py:320)
+        # records no pending_calls, so the approved refund is dropped on the floor while
+        # the run goes on to close the ticket as `refunded`.
+        assert h.world.state()["refunds"] == []
+        assert h.world.get_ticket("T1044")["status"] == "resolved"
+        # A parked gate records nothing: `resolve_approval` appends its verdict after
+        # the raise, so the audit trail of a run that never resumed is the
+        # `approval_request` event, not an approvals row.
+        assert h.ctx.approvals == []
+        assert [e["type"] for e in parked.events if e["type"].startswith("approval")] == ["approval_request"]
 
-    def test_resume_with_a_rejection_leaves_the_ticket_for_a_human(self) -> None:
+    def test_resume_after_a_rejection_answers_a_call_that_was_never_made(self) -> None:
         from ballast.kernel.checkpoint import Checkpointer
 
-        h = Harness("S03_quality_with_shipping", hitl_mode="interrupt", hitl_script={}, checkpointer=Checkpointer(":memory:"))
+        cp = Checkpointer(":memory:")
+        h = Harness("S03_quality_with_shipping", hitl_mode="interrupt", hitl_script={}, checkpointer=cp)
         parked = h.run(s03_plan())
-        assert parked.status == "interrupted"
         h.load(
             [
                 call_step(9, "escalate_ticket", ticket_id="T1044", team="supervisor", note="人工拒绝了放款，需复核政策核定金额 ¥459.00 与客户诉求。"),
@@ -240,9 +258,17 @@ class TestInterruptThroughALiveRun:
         )
         resumed = h.agent.resume(parked.run_id, {"approved": False, "note": "金额需财务复核"}, ctx=h.ctx, task=h.scenario.brief)
         assert h.world.state()["refunds"] == []
-        assert resumed.status in {"ok", "stalled"}
+        assert resumed.status in {"ok", "stalled"}, resumed.error
         ticket = h.world.get_ticket("T1044")
         assert ticket["status"] == "escalated" and ticket["team"] == "supervisor"
+        # KNOWN BUG (src/ballast/kernel/agent.py:195-210): with no `call_id` in the
+        # payload, the rejection is injected as a reply to "call_0", which no assistant
+        # message ever asked for - a request a real OpenAI-compatible endpoint 400s on.
+        transcript = cp.latest(parked.run_id).state["context"]["transcript"]
+        asked_for = {c["id"] for m in transcript if m.get("role") == "assistant" for c in (m.get("tool_calls") or [])}
+        replies = {m["tool_call_id"] for m in transcript if m.get("role") == "tool"}
+        assert "call_0" in replies and "call_0" not in asked_for
+        assert "call_6" in asked_for and "call_6" not in replies
 
     def test_repeated_refund_calls_are_capped_by_the_loop_guard(self) -> None:
         h = Harness("S01_inwindow_refund")

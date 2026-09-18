@@ -114,6 +114,11 @@ class SurrogatePolicy:
             return "read_scratch", {"handle": handle, "offset": 0, "limit": 20_000}
 
         intent = t.intent()
+        # Disposed is disposed: a confirmed close or escalation ends this ticket,
+        # however the flow reached that conclusion.
+        if intent.ticket and intent.ticket in t.handled_tickets() and not intent.batch:
+            return None
+
         if intent.batch and not t.saw("list_tickets"):
             return "list_tickets", {"status": "open", "limit": 50}
 
