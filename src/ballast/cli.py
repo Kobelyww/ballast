@@ -16,7 +16,7 @@ from typing import Any
 from .bench.fixtures_bridge import load_suite
 from .bench.report import markdown as render_markdown
 from .bench.runner import DEFAULT_ARMS, resolve_arm, run_scenario, run_suite
-from .env.fixtures import by_id
+from .env.fixtures import by_id, scenarios
 from .kernel.checkpoint import Checkpointer
 from .llm.base import Pricing
 from .memory.distill import distill
@@ -94,7 +94,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _cmd_run(args: argparse.Namespace, data: Path) -> int:
-    scenario = by_id(args.scenario)
+    try:
+        scenario = by_id(args.scenario)
+    except StopIteration:
+        known = ", ".join(sc.id for sc in scenarios())
+        print(f"no scenario '{args.scenario}'. available: {known}", file=sys.stderr)
+        return 2
     arm = resolve_arm(args.arm)
     provider_kind = args.provider
     if args.replay:

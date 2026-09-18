@@ -91,6 +91,31 @@ def markdown(result: SuiteResult, *, baseline: str = "naive", reference: str = "
             )
     lines.append("")
 
+    lines.append("## Where the savings actually come from")
+    lines.append("")
+    lines.append(f"Aggregated over every scenario, the reference arm's cost ratio can hide its own sign. "
+                 "Split by scenario class (tags from `env/fixtures.py`) it usually cannot:")
+    lines.append("")
+    lines.append("| scenario class | n | mean cost " + reference + " | mean cost " + baseline + " | " + baseline + "/" + reference + " cost | " + baseline + "/" + reference + " prompt tokens |")
+    lines.append("|---|---:|---:|---:|---|---|")
+    for label, ids in _classes(result).items():
+        cmp_ = _paired(result, baseline, reference, restrict=ids)
+        if not ids:
+            continue
+        cost_ref = sum(r.cost for r in result.rows if r.arm == reference and r.scenario_id in ids) / max(1, len([r for r in result.rows if r.arm == reference and r.scenario_id in ids]))
+        cost_base = sum(r.cost for r in result.rows if r.arm == baseline and r.scenario_id in ids) / max(1, len([r for r in result.rows if r.arm == baseline and r.scenario_id in ids]))
+        ratio = cmp_["ratio"]
+        tok = _paired_tokens(result, baseline, reference, ids)
+        enough = len(ids) >= 5
+        cost_cell = f"{ratio.point:.2f} [{ratio.low:.2f}, {ratio.high:.2f}]" if ratio and enough else (f"{ratio.point:.2f} (n too small)" if ratio else "—")
+        tok_cell = f"{tok.point:.2f} [{tok.low:.2f}, {tok.high:.2f}]" if tok and enough else (f"{tok.point:.2f} (n too small)" if tok else "—")
+        lines.append(f"| {label} | {len(ids)} | {_money(cost_ref)} | {_money(cost_base)} | {cost_cell} | {tok_cell} |")
+    lines.append("")
+    lines.append("_A ratio above 1.00 with a lower bound above 1.00 means the uncontrolled arm is "
+                 "**reliably more expensive** on that class; a CI spanning 1.00 means the suite cannot "
+                 "tell. Read the classes, not just the aggregate._")
+    lines.append("")
+
     lines.append("## Where failures come from")
     lines.append("")
     lines.append("| arm | agent faults | runtime faults | environment faults | top codes |")
@@ -145,11 +170,42 @@ def _pareto(arms: list[str], summary: dict[str, dict[str, Any]]) -> dict[str, li
     return out
 
 
-def _paired(result: SuiteResult, left: str, right: str) -> dict[str, Any]:
+def _classes(result: SuiteResult) -> dict[str, set[str]]:
+    """Scenario ids by declared class, so cost claims can be split by task type."""
+    from ..env.fixtures import scenarios
+
+    classes: dict[str, set[str]] = {"all scenarios": {r.scenario_id for r in result.rows}}
+    named = {s.id: s for s in scenarios()}
+    for tag in ("long_horizon", "batch", "bloat", "restraint", "flaky", "retrieval"):
+        ids = {sid for sid, sc in named.items() if tag in sc.tags and sid in classes["all scenarios"]}
+        if ids:
+            classes[f"class: {tag}"] = ids
+    ordinary = {r.scenario_id for r in result.rows} - set().union(*(v for k, v in classes.items() if k.startswith("class:")) if any(k.startswith("class:") for k in classes) else [set()])
+    if ordinary:
+        classes["ordinary (no special tag)"] = ordinary
+    return classes
+
+
+def _paired_tokens(result: SuiteResult, left: str, right: str, ids: set[str]) -> Any:
+    def best(arm: str) -> dict[str, int]:
+        out: dict[str, list[int]] = {}
+        for row in result.rows:
+            if row.arm == arm and row.scenario_id in ids:
+                out.setdefault(row.scenario_id, []).append(row.prompt_tokens_total)
+        return {k: sum(v) / len(v) for k, v in out.items()}
+
+    l, r = best(left), best(right)
+    shared = sorted(set(l) & set(r))
+    if not shared:
+        return None
+    return paired_ratio_ci([r[s] for s in shared], [l[s] for s in shared])
+
+
+def _paired(result: SuiteResult, left: str, right: str, restrict: set[str] | None = None) -> dict[str, Any]:
     def best(arm: str) -> dict[str, tuple[bool, float]]:
         out: dict[str, tuple[bool, float]] = {}
         for row in result.rows:
-            if row.arm != arm:
+            if row.arm != arm or (restrict is not None and row.scenario_id not in restrict):
                 continue
             prev = out.get(row.scenario_id)
             out[row.scenario_id] = (row.ok, row.cost) if prev is None or row.ok else prev
