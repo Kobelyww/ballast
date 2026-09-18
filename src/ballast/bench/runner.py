@@ -309,6 +309,89 @@ def _scoped_ticket(task_id: str) -> str | None:
     return task_id if task_id.startswith("T") else None
 
 
+class UnknownTask(KeyError):
+    """A checkpoint whose task is no longer in the scenario library."""
+
+
+def find_scenario(scenario_id: str) -> Any:
+    """Resolve a task across both domains; a checkpoint stores only an id."""
+    from ..env.incident_fixtures import scenarios as incident_scenarios
+
+    for pool in (scenarios(), incident_scenarios()):
+        for candidate in pool:
+            if candidate.id == scenario_id:
+                return candidate
+    raise KeyError(scenario_id)
+
+
+def resume_run(
+    run_id: str,
+    verdict: dict[str, Any],
+    *,
+    checkpointer: Any,
+    provider_kind: str = "surrogate",
+    model: str = "deepseek-chat",
+) -> Any:
+    """Rebuild the runtime that parked a run, then continue it.
+
+    The whole point of a durable pause is that a *later, different* process can pick it
+    up, so it has to be able to reconstruct the same arm — same budgets, same policy
+    driver, same invariant checker — from the checkpoint's own arm name.
+    """
+    checkpoint = checkpointer.latest(run_id)
+    if checkpoint is None:
+        raise KeyError(run_id)
+    task_id = checkpoint.state.get("task_id", "")
+    try:
+        scenario = find_scenario(task_id)
+    except KeyError as exc:
+        raise UnknownTask(task_id) from exc
+    # An ad-hoc runtime (a test harness, an old build) may have parked the run under an
+    # arm name that is no longer in the menu. Resumability should not depend on that.
+    name = checkpoint.state.get("arm") or "ballast"
+    arm = resolve_arm(name) if name in DEFAULT_ARMS else resolve_arm("ballast")
+    # Resume is always a human-approval conversation, whatever the arm default was.
+    arm.runtime = {**arm.runtime, "hitl_mode": "interrupt"}
+    agent, ctx = build_agent(scenario, arm, provider_kind=provider_kind, model=model, checkpointer=checkpointer)
+    return agent.resume(run_id, verdict, ctx=ctx)
+
+
+def build_agent(scenario: Any, arm: Arm, *, provider_kind: str = "surrogate", model: str = "deepseek-chat", skills: Any = None, pricing: Pricing | None = None, cache_dir: Path | str | None = None, checkpointer: Any = None) -> tuple[Any, Any]:
+    """Construct the agent and its shared RunContext for one (scenario, arm) pair."""
+    from ..env.incident_verify import audit as audit_ops
+
+    domain = getattr(scenario, "domain", "desk")
+    ops = domain == "ops"
+    world = scenario.build_world()
+    (apply_ops_faults if ops else apply_faults)(scenario, world)
+    kb = runbook_kb() if ops else KnowledgeBase.from_dir()
+    verdicts = {"issue_refund": bool(scenario.expect.get("hitl"))} if not ops else {"page_oncall": True, "rollback_deploy": True}
+    ctx = RunContext(task_id=scenario.id, arm=arm.name, world=world, sop=kb, hitl_mode="scripted", hitl_script=verdicts)
+    ctx.scratch = ScratchStore()
+    provider = make_provider(
+        provider_kind,
+        profile=SurrogateProfile(**_known(SurrogateProfile, arm.profile)) if arm.profile else None,
+        cache_dir=cache_dir,
+        model=model,
+        domain=domain,
+        profile_fields=arm.profile,
+    )
+    runtime = dict(arm.runtime)
+    runtime.pop("briefing_mode", None)
+    config = AgentConfig(
+        provider=provider,
+        toolkit=Toolkit(build_ops_tools(ctx) if ops else build_desk_tools(ctx)),
+        model=model,
+        context=ContextPolicy(**{**asdict(ContextPolicy()), **arm.context}),
+        budget=RunBudget(**{**_BUDGET_DEFAULTS, **_budget_args(arm.budget)}),
+        pricing=pricing or Pricing(),
+        invariant_check=(lambda w, c: audit_ops(w)) if ops else (lambda w, c: audit_desk(w, sop_ids=kb.section_ids(), ticket_id=_scoped_ticket(c.task_id))),
+        checkpointer=checkpointer,
+        **runtime,
+    )
+    return Agent(config, world=world, kb=kb, skills=skills), ctx
+
+
 def _known(cls: type, fields: dict[str, Any]) -> dict[str, Any]:
     allowed = set(getattr(cls, "__dataclass_fields__", {}))
     return {k: v for k, v in (fields or {}).items() if k in allowed}

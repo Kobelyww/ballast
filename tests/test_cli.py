@@ -182,7 +182,9 @@ class TestTraceAndApprovals:
 
         assert main(["--data-dir", str(root), "approvals", "resolve", "--run-id", result.run_id, "--approved"]) == 0
         text = out(capsys)
-        assert "resolved" in text and "Agent.resume()" in text and result.run_id in text
+        # The CLI really resumes now, so the assertion is about the outcome it reports:
+        # the parked refund landing, not a pointer at the library.
+        assert result.run_id in text and "status=ok" in text and "459.00" in text
 
     def test_resolve_needs_a_run_id(self, capsys: pytest.CaptureFixture[str], data: list[str]) -> None:
         assert main([*data, "approvals", "resolve"]) == 2

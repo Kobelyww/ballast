@@ -15,7 +15,7 @@ from typing import Any
 
 from .bench.fixtures_bridge import load_suite
 from .bench.report import markdown as render_markdown
-from .bench.runner import DEFAULT_ARMS, resolve_arm, run_scenario, run_suite
+from .bench.runner import DEFAULT_ARMS, UnknownTask, resolve_arm, resume_run, run_scenario, run_suite
 from .env.fixtures import by_id, scenarios
 from .kernel.checkpoint import Checkpointer
 from .llm.base import Pricing
@@ -63,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     approvals_p.add_argument("action", nargs="?", default="list", choices=["list", "resolve"])
     approvals_p.add_argument("--run-id", default="")
     approvals_p.add_argument("--approved", action="store_true")
+    approvals_p.add_argument("--by", default="", help="who decided; recorded on the run")
+    approvals_p.add_argument("--note", default="", help="why; surfaced to the agent on rejection")
 
     skills_p = sub.add_parser("skills", help="distill, gate and list skill cards")
     skills_p.add_argument("action", nargs="?", default="list", choices=["list", "distill", "gate"])
@@ -178,6 +180,11 @@ def _cmd_trace(args: argparse.Namespace, data: Path) -> int:
     return 0
 
 
+def checkpoint_task_id(cp: Checkpointer, run_id: str) -> str:
+    found = cp.latest(run_id)
+    return str((found.state if found else {}).get("task_id", "?"))
+
+
 def _cmd_approvals(args: argparse.Namespace, data: Path) -> int:
     cp = Checkpointer(data / "runs.db")
     pending = cp.pending_interrupts()
@@ -187,8 +194,35 @@ def _cmd_approvals(args: argparse.Namespace, data: Path) -> int:
     if not args.run_id:
         print("--run-id is required to resolve", file=sys.stderr)
         return 2
-    print(f"resolved {args.run_id} approved={args.approved}; call Agent.resume() with the verdict to continue the run")
-    return 0
+    try:
+        result = resume_run(
+            args.run_id,
+            {"approved": args.approved, "by": args.by or "cli", "note": args.note or ""},
+            checkpointer=cp,
+        )
+    except UnknownTask:
+        print(
+            f"run {args.run_id} belongs to task '{checkpoint_task_id(cp, args.run_id)}', which is not in the scenario library; "
+            "the run can still be inspected with `ballast trace`",
+            file=sys.stderr,
+        )
+        return 1
+    except KeyError:
+        print(f"no checkpoints for {args.run_id} in {data / 'runs.db'}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # noqa: BLE001 - a CLI must report, not dump a traceback
+        print(f"could not resume {args.run_id}: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"resumed {result.run_id}: status={result.status} steps={result.steps} cost={result.cost:.4f} "
+        f"guardrails={result.guardrail_blocks} approved={args.approved}"
+    )
+    for line in (result.final_text or "").splitlines():
+        if line.strip():
+            print(f"  {line}")
+    if result.interrupted:
+        print("  note: another approval is still pending", file=sys.stderr)
+    return 0 if result.status in {"ok", "interrupted"} else 1
 
 
 def _cmd_skills(args: argparse.Namespace, data: Path) -> int:
