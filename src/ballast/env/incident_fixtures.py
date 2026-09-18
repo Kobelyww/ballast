@@ -222,6 +222,64 @@ def scenarios() -> list[IncidentScenario]:
             tags=["restraint"],
         )
     )
+    out.extend(_holdout_variants())
+    return out
+
+
+def _holdout_variants() -> list[IncidentScenario]:
+    """More held-out incidents, for the same reason the after-sales slice was widened:
+    a paired exact test on two tasks cannot reach significance however well a skill
+    works, so a gate with n=2 can only ever say 'no'."""
+    out: list[IncidentScenario] = []
+    specs = [
+        ("rollback", "sev2", "standard", 1, 15, "recent", True, "接口错误率上升"),
+        ("rollback", "sev2", "standard", 2, 300, "stale", False, "超时率上升"),
+        ("paging", "sev1", "standard", 1, 20, "frozen", False, "支付失败率上升"),
+        ("rollback", "sev3", "internal", 1, 10, "recent", True, "缓存命中率下降"),
+        ("paging", "sev2", "payments", 2, 12, "human", False, "对账延迟"),
+        ("escalation", "sev1", "standard", 4, 8, "blast", True, "多链路抖动"),
+        ("rollback", "sev2", "standard", 1, 45, "recent", True, "队列积压"),
+    ]
+    for i, (family, severity, tier, blast, minutes, kind, _ignored, title) in enumerate(specs):
+        # Authored from the stated rule, not copied from the engine: freshness, the
+        # sev1 change freeze and the blast-radius limit. `test_expectations_agree_with_
+        # the_incident_policy_engine` is what catches a rule change that only one side
+        # knows about.
+        from .incident_policy import BLAST_RADIUS_LIMIT, FREEZE_SEVERITIES, ROLLBACK_MAX_AGE_MINUTES
+
+        rollback_expected = (
+            minutes <= ROLLBACK_MAX_AGE_MINUTES
+            and severity not in FREEZE_SEVERITIES
+            and blast <= BLAST_RADIUS_LIMIT
+        )
+        sid, iid, did = f"H{i}SVC", f"INC-9{i:02d}", f"H{i}D"
+        from datetime import datetime, timedelta
+        finished = (datetime.fromisoformat(NOW) - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+        out.append(
+            IncidentScenario(
+                id=f"OH{i+3}_holdout",
+                title=f"[holdout] {severity} {title}",
+                skill_family=family,
+                difficulty="hard",
+                brief=f"故障 {iid}：{title}，请按 runbook 处置并结单。",
+                fixture=_f(
+                    services=[service(sid, name=f"holdout-svc-{i}", tier=tier, blast=blast)],
+                    incidents=[incident(iid, sid, severity=severity, title=title)],
+                    alerts=[alert(f"HA{i}", iid, name="error_rate")],
+                    deployments=[{"id": did, "service_id": sid, "version": f"1.{i}.0", "finished_at": finished, "author": "ci", "canary": 0}],
+                ),
+                expect={
+                    "page": severity in {"sev1", "sev2"},
+                    "team": "sre" if severity in {"sev1", "sev2"} else "service",
+                    "rolled_back": rollback_expected,
+                    # The runbook owes a human owner and a review to sev1/sev2 only.
+                    "acknowledged": severity in {"sev1", "sev2"},
+                    "review": severity in {"sev1", "sev2"},
+                    "closed": True,
+                },
+                holdout=True,
+            )
+        )
     return out
 
 

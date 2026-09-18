@@ -22,8 +22,8 @@ from ballast.tools.ops import build_ops_tools
 
 
 def test_the_second_domain_ships_train_and_holdout_slices() -> None:
-    assert len(scenarios()) == 9
-    assert len(train_slice()) == 7
+    assert len(scenarios()) == 16
+    assert len(train_slice()) == 7  # the extra slice is held out, deliberately
     assert all(s.domain == "ops" for s in scenarios())
 
 
@@ -147,7 +147,7 @@ class TestRunnerIsDomainAgnostic:
         suite = load_suite("all")
         domains = {getattr(s, "domain", "desk") for s in suite}
         assert domains == {"desk", "ops"}
-        assert len(suite) == 43  # 34 after-sales tasks + 9 incidents
+        assert len(suite) == 50  # 34 after-sales tasks + 16 incidents
 
     def test_the_same_arm_spec_drives_both(self) -> None:
         desk = next(s for s in load_suite("train") if s.id == "S01_inwindow_refund")

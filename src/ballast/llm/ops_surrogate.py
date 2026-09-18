@@ -64,9 +64,13 @@ class OpsSurrogatePolicy:
         if not t.saw("search_runbook"):
             return "search_runbook", {"query": "呼叫 升级 回滚 复盘 要求", "top_k": 3}
 
-        if not self.profile.skip_assessment and not t.saw("evaluate_escalation_required", iid):
+        # Same contract as the after-sales driver: a card carries a machine-readable
+        # trigger. A model is asked to follow it; this stand-in is made to, which is what
+        # lets the promotion gate be tested in both directions with no API key.
+        skip_assessment = self.profile.skip_assessment and not t.has_trigger("force_escalation_assessment")
+        if not skip_assessment and not t.saw("evaluate_escalation_required", iid):
             return "evaluate_escalation_required", {"incident_id": iid}
-        if self.profile.skip_assessment and not t.saw("evaluate_escalation_required", iid):
+        if skip_assessment and not t.saw("evaluate_escalation_required", iid):
             sev = str((t.result_of("get_incident", iid) or {}).get("severity", "sev2")).lower()
             return "page_oncall", {"incident_id": iid, "team": "sre" if sev in {"sev1", "sev2"} else "service", "reason": "自行判断需呼叫"}
 
@@ -162,6 +166,10 @@ class _OpsTranscript:
             return None
         _, last = rows[-1]
         return last if "error" in last and self._matches(last, scope) else None
+
+    def has_trigger(self, marker: str) -> bool:
+        token = f"TRIGGER:{marker}"
+        return any(token in str(msg.get("content", "")) for msg in self.messages if msg.get("role") == "system")
 
     def incident_id(self) -> str | None:
         for msg in self.messages:

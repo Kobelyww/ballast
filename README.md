@@ -89,15 +89,29 @@ invisible.
   key, so restarting a checkpointed run replays stored results instead of re-firing a
   refund. `interrupt` mode parks a run in SQLite; a different process can list pending
   approvals hours later and resume it.
-- **Self-improvement with a statistical gate.** A distilled skill card starts as
-  `candidate` and is never injected into a live prompt. It becomes `active` only by
-  winning identical holdout tasks under an exact paired test with
-  Benjamini-Hochberg correction across concurrent candidates, plus a bootstrap bound
-  on the cost ratio. This is falsifiable by design: on a 3-task holdout the gate
-  **rejected a card that fixed all three** (p = 0.25 — n = 3 cannot reach
-  significance); on an 11-task holdout the same gate promoted the same kind of card
-  (p = 0.001, BH-adjusted 0.0012, 11 fixed / 0 regressed, cost ratio 1.02) and
-  rejected a card that changed nothing.
+- **Self-improvement with a statistical gate, in both domains.** A distilled skill card
+  starts as `candidate` and is never injected into a live prompt. It becomes `active`
+  only by winning identical held-out tasks under an exact paired test with
+  Benjamini-Hochberg correction across concurrent candidates, plus a bound on cost.
+  After-sales: 14 cards promoted, **11 held-out tasks fixed, 0 regressed,
+  p = 0.0010** (BH-adjusted 0.0010). Incidents: 6 cards promoted, **9 fixed, 0
+  regressed, p = 0.0039**. And it refuses: on a 3-task slice the gate **rejected a card
+  that fixed all three**, because n = 3 cannot reach significance.
+
+### The gate had a bug, and the second domain is what exposed it
+
+The incidents gate retired every card — including one that fixed **9 of 9** held-out
+incidents with zero regressions (p = 0.0039) — for "cost ratio 2.00 exceeds the 1.35
+ceiling". Reading it, the ceiling was wrong rather than the card: it compared cost **per
+attempt**, and the baseline was a policy that gets refused by a guardrail and stalls
+almost immediately. A cheap failure beat an expensive success, so the gate would have
+vetoed essentially any real improvement over a broken baseline.
+
+Now it prices **cost per success**, keeps the attempt ratio in the verdict for
+transparency, applies a hard absolute ceiling so a 5x blow-up still needs a human
+(`tests/test_skills_and_promotion.py` keeps that case), and says out loud when the basis
+is undefined because the baseline never passed anything. Nothing about the card's
+statistics changed — only what "too expensive" means.
 - **Context engineering is attributable, not decorative.** Tool-output offloading to
   content-addressed handles, whole-block compaction that never orphans a `tool_calls`
   message, pinned re-fetches, and a CJK-aware token budget checked *before* the

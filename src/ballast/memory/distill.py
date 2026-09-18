@@ -15,6 +15,11 @@ from ..memory.skills import Skill
 
 READ_TOOLS = {"get_ticket", "get_order", "get_customer", "search_sop", "compute_refund", "check_coupon_eligibility", "list_tickets", "list_orders_by_phone"}
 FAMILY_TRIGGERS = {
+    # Ops families: the failure the guardrail exists to stop is paging or reverting
+    # without first asking the policy engine.
+    "rollback": ["TRIGGER:force_escalation_assessment"],
+    "paging": ["TRIGGER:force_escalation_assessment"],
+    "escalation": ["TRIGGER:force_escalation_assessment"],
     "refund_window": ["TRIGGER:force_compute_refund"],
     "missing_item": ["TRIGGER:force_compute_refund"],
     "quality_claim": ["TRIGGER:force_compute_refund"],

@@ -41,7 +41,25 @@ found, and what it now measures that it previously could not.
 
 ### Fixed
 
-- `Interrupt` was being swallowed by the tool layer's crash handler, so an
+- **The promotion gate priced the wrong thing.** Its cost ceiling compared cost *per
+  attempt*, so a guardrail-refused-then-stalled baseline (cheap, always wrong) vetoed
+  cards that fixed every held-out task — all six incident cards were retired this way,
+  including one at p = 0.0039 with 9/9 fixed and 0 regressed. The gate now compares
+  cost **per success**, keeps the attempt ratio in the verdict, enforces a hard absolute
+  ceiling so an unbounded blow-up still needs sign-off, and reports explicitly when
+  cost-per-success is undefined because the baseline never succeeded.
+- `close_incident` overwrote the mitigation ledger with its resolution string, so a
+  completed acknowledgement and review read as never-done and the close-out was refused
+  forever; `get_incident` also left that column unparsed.
+- `OpsWorld` deadlocked: `rollback_deploy` read current state while holding a plain
+  `Lock`.
+- `approvals resolve` printed instructions instead of resuming the run.
+
+### Added (also)
+
+- **Cross-domain self-improvement**: the incidents domain distills cards that the same
+  gate evaluates on an expanded 9-task incident holdout (a 2-task slice could never
+  reach significance, so the gate could only ever say no). by the tool layer's crash handler, so an
   approval-gated run kept spending instead of parking. This was also failing the two
   long-horizon tasks.
 - Compaction folded away the opening user message, leaving an agent holding a digest of

@@ -37,6 +37,7 @@ class GateVerdict:
     p_adjusted: float = 1.0
     success_delta: float = 0.0
     cost_ratio: Interval | None = None
+    cost_ratio_per_attempt: Interval | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -49,6 +50,7 @@ class GateVerdict:
             "p_adjusted": round(self.p_adjusted, 5),
             "success_delta": self.success_delta,
             "cost_ratio": self.cost_ratio.as_dict() if self.cost_ratio else None,
+            "cost_ratio_per_attempt": self.cost_ratio_per_attempt.as_dict() if self.cost_ratio_per_attempt else None,
         }
 
 
@@ -108,26 +110,71 @@ def judge(
     ratio = paired_ratio_ci([base[s][1] or 1e-9 for s in shared], [treat[s][1] or 1e-9 for s in shared])
     delta = (sum(treat[s][0] for s in shared) - sum(base[s][0] for s in shared)) / max(1, len(shared))
 
+    # Price *success*, not attempts. A card that fixes a run which was previously
+    # refused-and-aborted costs more per attempt by construction — comparing raw
+    # attempt cost rewards the cheap failure and would veto every real improvement.
+    rate_base = sum(base[s][0] for s in shared) / max(1, len(shared))
+    rate_treat = sum(treat[s][0] for s in shared) / max(1, len(shared))
+    mean_base = sum(base[s][1] or 1e-9 for s in shared) / max(1, len(shared))
+    mean_treat = sum(treat[s][1] or 1e-9 for s in shared) / max(1, len(shared))
+    cps_base = mean_base / rate_base if rate_base else float("inf")
+    cps_treat = mean_treat / rate_treat if rate_treat else float("inf")
+    cps_ratio = None
+    if cps_base != float("inf") and cps_treat != float("inf") and cps_base > 0:
+        cps_ratio = paired_ratio_ci(
+            [(base[s][1] or 1e-9) / rate_base for s in shared],
+            [(treat[s][1] or 1e-9) / rate_treat for s in shared],
+        )
+
     reasons: list[str] = []
     if b == 0:
         reasons.append("no task went from failure to success: the card changed nothing")
     if c > 0:
         reasons.append(f"{c} task(s) regressed: the card is net harmful")
-    if b > 0 and p > alpha:
+    if b > 0 and p > alpha:  # noqa: SIM108
         reasons.append(f"improvement not significant (exact McNemar p={p:.4f} > {alpha}) with n={len(shared)}")
-    if not ratio.crosses(max_cost_ratio) and ratio.low > max_cost_ratio:
-        reasons.append(f"cost ratio {ratio.point:.2f} [{ratio.low:.2f}, {ratio.high:.2f}] exceeds the {max_cost_ratio:.2f} ceiling")
+    if rate_base == 0 and b > 0:
+        # Cost per success is undefined when the baseline never succeeded, and attempt
+        # cost is the wrong yardstick against a run that was refused and aborted cheap.
+        # Say so, rather than silently picking whichever ratio happens to pass.
+        # No cost-per-success exists to compare, so the attempt ratio is reported for
+        # transparency and a hard absolute ceiling still applies: a card that fixes
+        # everything at 5x the spend still needs a human to sign off on the bill.
+        hard_ceiling = max_cost_ratio * 3
+        if ratio.low > hard_ceiling:
+            reasons.append(
+                f"cost ratio {ratio.point:.2f} [{ratio.low:.2f}, {ratio.high:.2f}] exceeds the hard "
+                f"ceiling {hard_ceiling:.2f}; baseline never succeeded, so cost per success is undefined"
+            )
+        else:
+            reasons.append(
+                f"cost basis reported, not enforced: baseline succeeded on 0/{len(shared)} held-out tasks, "
+                f"so cost-per-success is undefined; attempt cost ratio {ratio.point:.2f} is within the hard ceiling"
+            )
+    if cps_ratio is not None and cps_ratio.low > max_cost_ratio:
+        reasons.append(
+            f"cost per success rose {cps_ratio.point:.2f}x [{cps_ratio.low:.2f}, {cps_ratio.high:.2f}] "
+            f"against a {max_cost_ratio:.2f} ceiling"
+        )
 
+    blocking = [r for r in reasons if not r.startswith("cost basis reported")]
     verdict = GateVerdict(
         skill_id=skill.id,
         skill_name=skill.name,
-        promoted=not reasons,
-        reasons=reasons or [f"promoted: {b} fixed, {c} regressed, p={p:.4f}, cost ratio {ratio.point:.2f}"],
+        promoted=not blocking,
+        reasons=(
+            blocking
+            or [
+                f"promoted: {b} fixed, {c} regressed, p={p:.4f}, "
+                + (f"cost per success {cps_ratio.point:.2f}x" if cps_ratio else f"cost per success undefined (baseline never passed); attempt cost {ratio.point:.2f}x")
+            ]
+        ),
         pairs=pairs,
         p_value=p,
         p_adjusted=p,
         success_delta=delta,
-        cost_ratio=ratio,
+        cost_ratio=cps_ratio or ratio,
+        cost_ratio_per_attempt=ratio,
     )
     return verdict
 
@@ -140,9 +187,10 @@ def gate_library(
     baseline_arm: str = "defective",
     library: SkillLibrary | None = None,
     provider_kind: str = "surrogate",
+    suite_name: str = "holdout",
 ) -> list[GateVerdict]:
     """One candidate at a time — a card's value is measured against the library it joins."""
-    suite = list(holdout or load_suite("holdout"))
+    suite = list(holdout or load_suite(suite_name))
     lib = library or SkillLibrary()
     verdicts = [
         evaluate_candidate(skill, holdout=suite, baseline_arm=baseline_arm, library=lib, provider_kind=provider_kind)

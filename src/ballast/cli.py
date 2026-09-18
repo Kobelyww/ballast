@@ -266,7 +266,8 @@ def _cmd_skills(args: argparse.Namespace, data: Path) -> int:
     if not candidates:
         print("no candidates; run `ballast skills distill` first")
         return 1
-    verdicts = gate_library(candidates=candidates, library=library, baseline_arm=args.baseline_arm)
+    suite_name = "ops_holdout" if args.baseline_arm.startswith("ops_") else "holdout"
+    verdicts = gate_library(candidates=candidates, library=library, baseline_arm=args.baseline_arm, suite_name=suite_name)
     print(json.dumps([v.as_dict() for v in verdicts], ensure_ascii=False, indent=2))
     counts = apply_verdicts(library, verdicts)
     print(f"GATE candidates={len(verdicts)} promoted={counts['promoted']} retired={counts['retired']}")

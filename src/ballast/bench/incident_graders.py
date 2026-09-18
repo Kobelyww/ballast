@@ -40,8 +40,10 @@ def grade(scenario: IncidentScenario, world: OpsWorld, *, sop_ids: set[str] | No
     checks.append(Check("review_recorded", bool(review.strip()) == bool(expect.get("review")), f"review_recorded: expected {bool(expect.get('review'))}"))
 
     checks.append(Check("incident_status", row.get("status") == ("closed" if expect.get("closed") else "open"), f"incident_status: expected {'closed' if expect.get('closed') else 'open'}, got {row.get('status')}"))
-    if expect.get("rolled_back"):
-        checks.append(Check("rollback_target", any(a["tool"] == "rollback_deploy" and expect.get("deployment") in json.dumps(a["args"]) for a in state["actions"]), f"rollback_target: expected {expect.get('deployment')}"))
+    want_deploy = expect.get("deployment")
+    if expect.get("rolled_back") and want_deploy:
+        hit = any(a["tool"] == "rollback_deploy" and want_deploy in json.dumps(a["args"]) for a in state["actions"])
+        checks.append(Check("rollback_target", hit, f"rollback_target: expected {want_deploy} to be the reverted deployment"))
 
     if expect.get("human_gated"):
         approvals = [e["payload"] for e in (events or []) if e.get("type") == "approval_decision"]

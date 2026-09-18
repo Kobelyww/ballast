@@ -365,6 +365,7 @@ class TestJudge:
             "p_value",
             "p_adjusted",
             "success_delta",
+            "cost_ratio_per_attempt",
             "cost_ratio",
         }
         assert payload["cost_ratio"]["point"] == pytest.approx(1.2)
