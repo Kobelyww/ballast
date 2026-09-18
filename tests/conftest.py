@@ -11,6 +11,7 @@ Two rules the helpers encode:
 
 from __future__ import annotations
 
+import socket
 import sys
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,21 @@ class Harness:
             self.provider.steps = list(script)
             self.provider.index = 0
         return self.agent.run(self.scenario.brief, task_id=self.scenario.id, arm=self.ctx.arm, ctx=self.ctx)
+
+
+@pytest.fixture(autouse=True)
+def forbid_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ballast's test suite is offline by contract.
+
+    A test that reaches for a socket is a test that can bill money or flake, so the
+    syscall is blocked for every test rather than trusted to discipline.
+    """
+
+    def blocked(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("network access is forbidden in the ballast test suite")
+
+    monkeypatch.setattr(socket.socket, "connect", blocked)
+    monkeypatch.setattr(socket, "create_connection", blocked)
 
 
 @pytest.fixture

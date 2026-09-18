@@ -159,7 +159,7 @@ class Agent:
         ctx.emit("run_start", task_id=task_id, arm=arm, strategy=self.config.strategy, prompt_tokens=estimate_request_tokens(engine.assemble()))
         return self._loop(ctx, engine, task)
 
-    def resume(self, run_id: str, decision: dict[str, Any], *, task: str = "") -> RunResult:
+    def resume(self, run_id: str, decision: dict[str, Any], *, task: str = "", ctx: RunContext | None = None) -> RunResult:
         """Continue an interrupted run without re-firing any completed side effect."""
         if self.config.checkpointer is None:
             raise RuntimeError("resume requires a checkpointer")
@@ -167,29 +167,46 @@ class Agent:
         if checkpoint is None:
             raise KeyError(f"no checkpoint for run {run_id}")
         state = checkpoint.state
-        ctx = RunContext(
-            run_id=run_id,
-            task_id=state.get("task_id", ""),
-            arm=state.get("arm", ""),
+        # Same contract as run(): the caller's ctx is the one the tools were built
+        # against, so the restored policy computations must land on that object.
+        ctx = ctx or RunContext(
             world=self.world,
             sop=self.kb,
-            ledger=self.ledger,
             scratch=ScratchStore(),
-            hitl_mode=self.config.hitl_mode,
-            hitl_script=state.get("hitl_script", {}),
         )
+        ctx.run_id = run_id
+        ctx.task_id = state.get("task_id", "")
+        ctx.arm = state.get("arm", "")
+        ctx.ledger = self.ledger
+        ctx.hitl_mode = self.config.hitl_mode
+        ctx.hitl_script = dict(state.get("hitl_script") or {})
         ctx.computed.update(state.get("computed", {}))
         ctx.approvals.extend(state.get("approvals", []))
         ctx.guardrail_blocks = int(state.get("guardrail_blocks", 0))
         engine = ContextEngine.restore(state.get("context", {}), policy=self.config.context, scratch=ctx.scratch)
         ctx.emit("approval_decision", resumed=True, decision=decision, tool=state.get("interrupt", {}).get("tool"))
         decision_tool = (state.get("interrupt") or {}).get("tool")
+        # The human verdict *is* the gate for this run: resolve_approval must answer
+        # from it rather than parking the same call again.
+        if decision_tool:
+            ctx.hitl_mode = "scripted"
+            ctx.hitl_script = {decision_tool: bool(decision.get("approved"))}
+            ctx.pending_interrupt = None
         if decision_tool and decision.get("approved") is False:
+            interrupt_args = (state.get("interrupt") or {}).get("args") or {}
             engine.tool_result(
                 str(state.get("interrupt", {}).get("call_id", "call_0")),
                 decision_tool,
-                '{"ok": false, "error": "approval_rejected", "message": "a human rejected this action", '
-                '"hint": "do not retry it; close the ticket citing the rejection or escalate"}',
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "approval_rejected",
+                        **interrupt_args,
+                        "message": str(decision.get("note") or "a human rejected this action"),
+                        "hint": "do not retry it; close the ticket citing the rejection or escalate",
+                    },
+                    ensure_ascii=False,
+                ),
             )
         else:
             for call in state.get("pending_calls", []):
@@ -198,7 +215,7 @@ class Agent:
                 )
         self.ledger.set_budget(run_id, RunBudget.from_dict(state.get("budget", {})))
         for usage in state.get("usage_history", []):
-            self.ledger.record(run_id, Usage(**usage))
+            self.ledger.record(run_id, _usage_from(usage))
         for _ in range(int(state.get("steps", 0))):
             self.ledger.bump_step(run_id)
         ctx.events.extend(state.get("events", []))
@@ -468,7 +485,7 @@ class Agent:
             context=engine.stats.as_dict(),
             guardrail_blocks=ctx.guardrail_blocks,
             rejected_calls=ctx.rejected_calls,
-            tool_errors=sum(1 for e in ctx.of_type("tool_result") if e.payload.get("ok") is False),
+            tool_errors=sum(1 for e in ctx.events_typed() if e.type == "tool_result" and e.payload.get("ok") is False),
             findings=[p for e in ctx.of_type("critic") for p in e.payload.get("findings", [])],
             events=ctx.as_dicts(),
             interrupted=interrupt,
@@ -477,6 +494,14 @@ class Agent:
             degraded=ctx.extra.get("degraded", []),
             skills_applied=ctx.skills_applied,
         )
+
+
+_USAGE_FIELDS = {"input_tokens", "output_tokens", "cached_input_tokens", "calls"}
+
+
+def _usage_from(data: dict[str, Any]) -> Usage:
+    """`as_dict()` carries derived fields; only the stored ones may be rehydrated."""
+    return Usage(**{k: v for k, v in (data or {}).items() if k in _USAGE_FIELDS})
 
 
 def ledger_record(ledger: UsageLedger, run_id: str, response: ChatResponse, prompt_tokens: int) -> None:

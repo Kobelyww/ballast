@@ -206,6 +206,9 @@ class SurrogatePolicy:
         if t.saw("issue_refund", scope=order_id):
             return self._finish(t, intent, "refunded", "已退款")
         failure = t.error_for("issue_refund", order_id) or t.error_of("issue_refund")
+        if failure and str(failure.get("error")) == "approval_rejected":
+            team = "risk" if decision.get("requires_escalation") else "supervisor"
+            return "escalate_ticket", {"ticket_id": ticket, "team": team, "note": t.escalation_note(decision)}
         if failure and not t.saw("issue_refund", scope=order_id):
             code = str(failure.get("error"))
             if code == "upstream_timeout":

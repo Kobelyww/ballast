@@ -30,8 +30,9 @@ that passes a grade while the world is wrong, that is a bug in `bench/graders.py
   the mechanism is probably ~40 stdlib lines and worth keeping legible.
 - **Determinism is the contract.** New behaviour must be testable with `ScriptedModel`
   or the surrogate. Anything that makes CI require a key will be rejected.
-- **Never trim the suite to raise a score.** Two long-horizon tasks (`S17`, `S18`) are
-  known to fail and stay in. Fixing them is a contribution; hiding them is not.
+- **Never trim the suite to raise a score.** A scenario that no arm passes is a task
+  worth keeping: it is the only kind that shows headroom. Deleting it to green the
+  dashboard is not a contribution.
 - Claims in docs and READMEs need a row in `bench/results/` that produced them.
 
 Tests for a module live beside its behaviour, not its filename: read

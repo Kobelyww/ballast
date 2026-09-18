@@ -99,10 +99,21 @@ class RunContext:
         return self.ledger.step(self.run_id) if self.ledger is not None else len(self.events)
 
     def of_type(self, *types: str) -> list[RunEvent]:
-        return [e for e in self.events if e.type in types]
+        return [event for event in self.events_typed() if event.type in types]
+
+    def events_typed(self) -> list[RunEvent]:
+        """A resumed run restores its event tail as dicts; normalise once."""
+        out: list[RunEvent] = []
+        for event in self.events:
+            if isinstance(event, RunEvent):
+                out.append(event)
+                continue
+            out.append(RunEvent(type=event.get("type", "error"), step=int(event.get("step", 0)), ts=float(event.get("ts", 0.0)), payload=dict(event.get("payload") or {})))
+        return out
 
     def tool_names(self) -> list[str]:
         return [str(e.payload.get("name", "")) for e in self.of_type("tool_call")]
 
     def as_dicts(self) -> list[dict[str, Any]]:
-        return [event.as_dict() for event in self.events]
+        # A resumed run restores its tail as plain dicts, so both shapes occur here.
+        return [e if isinstance(e, dict) else e.as_dict() for e in self.events]

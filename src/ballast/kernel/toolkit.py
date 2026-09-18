@@ -25,6 +25,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal, get_args, get_origin
 
+from .hitl import Interrupt
+
 JSON_TYPE = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
 
@@ -414,6 +416,11 @@ class Toolkit:
 
         try:
             raw = tool_.call(clean)
+        except Interrupt:
+            # Control flow, not a failure. Swallowing this into an error result turns a
+            # run that should park into one that keeps spending — the durable-execution
+            # bug this runtime exists to avoid.
+            raise
         except ToolError as exc:
             payload = exc.as_dict()
             return ToolResult(name=name, ok=False, content=json.dumps(payload, ensure_ascii=False), error=payload)

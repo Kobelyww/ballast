@@ -215,7 +215,16 @@ def build_desk_tools(ctx: RunContext) -> list[Tool]:
             required=bool(computed["requires_approval"]),
         )
         if not decision.approved:
-            return {"ok": False, "error": "approval_rejected", "message": decision.note, "hint": "close the ticket citing the rejection reason"}
+            # The scope fields are payload content on purpose: a later step has to be
+            # able to tell *which* order was refused, not merely that something was.
+            return {
+                "ok": False,
+                "error": "approval_rejected",
+                "order_id": order_id,
+                "amount": amount,
+                "message": decision.note,
+                "hint": "do not retry this refund; close the ticket citing the rejection reason",
+            }
         try:
             result = world.issue_refund(order_id=order_id, amount=amount, reason=reason, note=note)
         except WorldError as exc:
@@ -243,7 +252,7 @@ def build_desk_tools(ctx: RunContext) -> list[Tool]:
             ctx, tool_name="send_coupon", args={"customer_id": customer_id, "value": value}, reason=f"coupon {value}: {reason}", required=False
         )
         if not decision.approved:
-            return {"ok": False, "error": "approval_rejected", "message": decision.note}
+            return {"ok": False, "error": "approval_rejected", "customer_id": customer_id, "value": value, "message": decision.note, "hint": "close the ticket citing the rejection reason"}
         try:
             return {"ok": True, **world.send_coupon(customer_id=customer_id, value=value, reason=reason)}
         except WorldError as exc:

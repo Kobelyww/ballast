@@ -89,13 +89,16 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **`naive` ties `ballast` on task success here.** The 28-task suite is not yet hard
-  enough to make context control pay off; peak context never exceeded ~8k tokens.
-  This suite is a mechanism test, not a leaderboard.
-- **Two long-horizon tasks are known-failing.** `S17_fat_order` and `S18_batch_queue`
-  (40-line order; 5-ticket batch) still stall under compaction. They are kept in the
-  suite as failing, because a benchmark you have trimmed to your pass rate is not a
-  benchmark.
+- **`naive` ties `ballast` on task success here, and is 11% cheaper.** The 28-task
+  suite is not yet long enough to make context control *pay* — peak context stays
+  under ~8k tokens, so offloading and compaction fire 6 and 3 times but never avert a
+  failure. This suite is a mechanism test, not a leaderboard, and the cost column is
+  the honest reason to run `naive` until your tasks are genuinely long.
+- **Long-horizon coverage is thin.** `S17_fat_order` (40-line order) and
+  `S18_batch_queue` (5 tickets in one context) exercise offload-then-refetch and
+  multi-goal transcripts, but both pass only under the tuned policy and neither has a
+  variant that is *harder* still. If you have a long-horizon suite, this project wants
+  it.
 - Skill-card *utility* is simulated through machine-readable triggers the surrogate is
   *made* to obey; with a real provider the same gate measures actual instruction
   following, but that transfer is not yet demonstrated.
