@@ -116,6 +116,25 @@ def markdown(result: SuiteResult, *, baseline: str = "naive", reference: str = "
                  "tell. Read the classes, not just the aggregate._")
     lines.append("")
 
+    lines.append("## The crossover")
+    lines.append("")
+    crossover = _crossover(result, baseline, reference)
+    if crossover:
+        lines.append(f"Sorted by task length, the ratio of `{baseline}` to `{reference}` prompt tokens is not a "
+                     "constant — it is a curve that crosses 1.00. This is the part a single aggregate number erases.")
+        lines.append("")
+        lines.append(f"| task | length ({baseline} prompt tok) | {baseline}/{reference} tokens | {baseline}/{reference} cost |")
+        lines.append("|---|---:|---:|---:|")
+        crossing = next((i for i, row in enumerate(crossover) if row[2] >= 1.0), None)
+        for index, (sid, length, tok_ratio, cost_ratio) in enumerate(crossover):
+            flag = " ← first task where control pays" if index == crossing else ""
+            lines.append(f"| `{sid}` | {length:,.0f} | {tok_ratio:.2f} | {cost_ratio:.2f}{flag} |")
+        lines.append("")
+        lines.append("_Below 1.00 the controlled arm is the more expensive one; above it, cheaper. "
+                     "The overhead is the retrieved policy briefing and skill machinery; the payoff is "
+                     "that a folded transcript is billed on every later call instead of forever._")
+    lines.append("")
+
     lines.append("## Where failures come from")
     lines.append("")
     lines.append("| arm | agent faults | runtime faults | environment faults | top codes |")
@@ -168,6 +187,32 @@ def _pareto(arms: list[str], summary: dict[str, dict[str, Any]]) -> dict[str, li
                 wins.append(b)
         out[a] = wins
     return out
+
+
+def _crossover(result: SuiteResult, baseline: str, reference: str, *, min_tasks: int = 4) -> list[tuple[str, float, float, float]]:
+    """Longest-first ratio of the uncontrolled arm to the controlled arm.
+
+    Only meaningful for tasks long enough to overflow a window, so the set is chosen by
+    measured size rather than by a hand-maintained tag list.
+    """
+    ids = {r.scenario_id for r in result.rows}
+    pairs = []
+    for sid in ids:
+        base = [r for r in result.rows if r.arm == baseline and r.scenario_id == sid]
+        ref = [r for r in result.rows if r.arm == reference and r.scenario_id == sid]
+        if not base or not ref:
+            continue
+        b_tok = sum(r.prompt_tokens_total for r in base) / len(base)
+        r_tok = sum(r.prompt_tokens_total for r in ref) / len(ref)
+        if r_tok <= 0:
+            continue
+        b_cost = sum(r.cost for r in base) / len(base)
+        r_cost = sum(r.cost for r in ref) / len(ref)
+        pairs.append((sid, b_tok, b_tok / r_tok, (b_cost / r_cost) if r_cost else float("inf")))
+    long_tasks = [p for p in pairs if p[1] >= 50_000]
+    if len(long_tasks) < min_tasks:
+        return []
+    return sorted(long_tasks, key=lambda p: p[1])
 
 
 def _classes(result: SuiteResult) -> dict[str, set[str]]:

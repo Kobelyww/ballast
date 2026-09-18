@@ -34,6 +34,7 @@ surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/exa
 |---|---|
 | **Guardrails hold under a deliberately defective policy** | The `defective` arm skipped the mandatory policy computation before moving money. **87 attempted payments were blocked by the runtime** and its success fell to **22.2% vs 100%** — paired Δ −77.8 points, exact McNemar **p = 0.0001**, Cohen's h = −2.16. The invariant held on every single run; no unverified payment ever landed. |
 | **A failing agent is not a cheap agent** | `defective` spent **0.45× of a correct run while succeeding a fifth as often**, and its pass^1→pass^3 collapses 22.2% → 4.9% → 1.1%. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
+| **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch (control costs 7% more), 1.06× at 9, 1.24× at 12, **1.49× at 16 tickets (control saves a third)**. The break-even sits near a 250k-token transcript. Reproduce it in `docs/BENCHMARK.md#the-crossover`; the table is generated from stored rows, not written by hand. |
 | **The suite is sensitive enough to reverse its own headline** | Aggregated, `ballast` and `naive` both finish **100% of the 29 tasks** and naive costs 1.12× as much — but that CI [0.87, 1.25] spans 1.00, so the honest verdict is "probably cheaper, not proven". Split by scenario class it *does* resolve: context control is **~1.2× cheaper on long-horizon and bloated-payload tasks** and **~0.95× — i.e. more expensive — on ordinary short ones**, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
 | **Reliability decays where capability does not** | Under `pass^k`, `tight_budget` falls **88.9% → 77.9% → 68.7%** across three consecutive draws, and `defective` collapses 22.2% → 4.9%. A pass@1 demo cannot see either curve. |
 | **Structured errors buy recovery** | The `noisy` arm produced **279 agent faults from malformed calls** (114 unknown arguments, 102 missing required ones, 63 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success** (Δ −27.8 points, p = 0.063) — a raise-and-crash tool layer converts it into 0%. |
@@ -108,9 +109,12 @@ Read these before trusting the table above; they are the interesting part.
   The class breakdown is better powered because it stops mixing a 450k-token batch run
   with 2k-token lookups — but it is still only 17-24 paired tasks, and the report
   suppresses intervals below five rather than printing confident-looking noise.
-- **Short tasks are cheaper without any of this.** On ordinary scenarios the controlled
-  arm costs about 5% *more*. If your agent handles one ticket per context window, run
-  `naive`; the benchmark is what tells you which world you are in.
+- **Short tasks are cheaper without any of this.** Under ~250k prompt tokens of total
+  transcript the controlled arm costs 5–7% *more*, and on a single fat-payload task it
+  costs 23% more, because offloading something you will need in full buys you a round
+  trip. If your agent handles one ticket per context window, run `naive`. The crossover
+  table is what tells you which world you are in — and it is a measured curve here, not
+  a vibe.
 - **Everything passes except the arms designed to fail.** A suite that the healthy arm
   scores 100% on is a mechanism test, not a difficulty ceiling: the discriminating
   signal here comes from the deliberately defective arms and from cost, not from task
@@ -145,7 +149,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 583 tests, ~13 seconds, no API key, no external network
+make test     # 608 tests, ~15 seconds, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace

@@ -462,7 +462,38 @@ def scenarios() -> list[Scenario]:
             tags=["long_horizon"],
         )
     )
+    out.extend(_batch_series())
     out.extend(_holdout_variants())
+    return out
+
+
+def _batch_series() -> list[Scenario]:
+    """A size ladder for the batch task, so cost claims can be split by task class.
+
+    One long task makes an interesting anecdote; a ladder makes an interval. With n >= 5
+    the paired bootstrap can actually say something about whether context control pays.
+    """
+    out: list[Scenario] = []
+    for size in (4, 6, 9, 12, 16):
+        tickets = [f"T9{size:02d}{i:02d}" for i in range(size)]
+        out.append(
+            Scenario(
+                id=f"B{size:02d}_batch_queue",
+                title=f"批量处理 {size} 张工单",
+                skill_family="batch",
+                difficulty="expert" if size >= 12 else "hard",
+                brief=f"把队列里所有 open 工单批量处理掉（共 {size} 张），都是无理由退货且签收都在窗口内。",
+                fixture=_f(
+                    customers=[customer(f"B{size}C{i}") for i in range(size)],
+                    orders=[order(f"B{size}O{i:03d}", f"B{size}C{i}", paid=35.0 + 7 * i) for i in range(size)],
+                    order_items=[item(f"B{size}I{i}", f"B{size}O{i:03d}", sku=f"SKUB-{size}-{i}", name=f"队列商品{i}，含配件与说明书的完整中文描述文本" + ("很" * 40), price=35.0 + 7 * i) for i in range(size)],
+                    shipments=[shipment(f"B{size}O{i:03d}", delivered="2026-05-18T12:00:00") for i in range(size)],
+                    tickets=[ticket(tickets[i], f"B{size}C{i}", f"B{size}O{i:03d}", "不想要了，无理由退款") for i in range(size)],
+                ),
+                expect={"outcome": "batch", "tickets": tickets, "ticket_status": "resolved", "hitl": True},
+                tags=["long_horizon"],
+            )
+        )
     return out
 
 
