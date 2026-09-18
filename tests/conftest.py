@@ -107,19 +107,43 @@ class Harness:
         return self.agent.run(self.scenario.brief, task_id=self.scenario.id, arm=self.ctx.arm, ctx=self.ctx)
 
 
+_LOCALHOST = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_loopback(target: Any) -> bool:
+    if isinstance(target, (tuple, list)) and target:
+        return str(target[0]) in _LOCALHOST
+    if isinstance(target, str):
+        host = target.split("://", 1)[-1].split("/")[0].split(":")[0]
+        return host in _LOCALHOST
+    return False
+
+
 @pytest.fixture(autouse=True)
-def forbid_network(monkeypatch: pytest.MonkeyPatch) -> None:
+def forbid_external_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ballast's test suite is offline by contract.
 
-    A test that reaches for a socket is a test that can bill money or flake, so the
-    syscall is blocked for every test rather than trusted to discipline.
+    A test that reaches for the internet can bill money or flake, so the syscall is
+    blocked for every test rather than trusted to discipline. Loopback stays open: the
+    OpenAI-compatible transport is only genuinely tested against a real socket, and
+    `scripts/mock_openai_server.py` is that socket. Anything not addressed to
+    127.0.0.1 still raises.
     """
+    real_connect = socket.socket.connect
+    real_create = socket.create_connection
 
-    def blocked(*args: Any, **kwargs: Any) -> None:
-        raise AssertionError("network access is forbidden in the ballast test suite")
+    def connect(self: Any, target: Any, *args: Any, **kwargs: Any) -> Any:
+        if not _is_loopback(target):
+            raise AssertionError(f"external network access is forbidden in the ballast test suite (tried {target!r})")
+        return real_connect(self, target, *args, **kwargs)
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
-    monkeypatch.setattr(socket, "create_connection", blocked)
+    def create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
+        if not _is_loopback(address):
+            raise AssertionError(f"external network access is forbidden in the ballast test suite (tried {address!r})")
+        return real_create(address, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket, "create_connection", create_connection)
 
 
 @pytest.fixture

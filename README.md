@@ -145,7 +145,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 568 tests, ~12 seconds, no API key, no network
+make test     # 583 tests, ~13 seconds, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
@@ -163,6 +163,16 @@ Point it at a real model — nothing else changes:
 export BALLAST_LLM_API_KEY=sk-...           # DeepSeek / Qwen / GLM / vLLM / Ollama
 export BALLAST_LLM_BASE_URL=https://api.deepseek.com
 ballast eval --provider openai-compat --model deepseek-chat --record   # cache for replay
+```
+
+No key to try that with? A bundled OpenAI-compatible server exercises the same HTTP
+path — auth header, request body, `tool_calls` arriving as a JSON string, vendor cache
+fields, a 429 retried without double-billing:
+
+```bash
+python scripts/mock_openai_server.py --port 8099 &
+BALLAST_LLM_API_KEY=mock BALLAST_LLM_BASE_URL=http://127.0.0.1:8099 \
+  ballast eval --provider openai-compat --model mock-chat
 ```
 
 ## What is in the box

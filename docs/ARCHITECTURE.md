@@ -105,6 +105,17 @@ The gate is deliberately strict enough to reject improvements that "look" convin
 on an 11-task holdout the same card that promotes at p=0.001 is rejected at p=0.25 on a
 3-task holdout, because three tasks cannot distinguish a skill from a coin flip.
 
+## Testing the wire without a wire
+
+`scripts/mock_openai_server.py` is a stdlib OpenAI-compatible server. `tests/test_provider_transport.py`
+drives the real provider through a real socket against it: bearer auth, body shape,
+`tools`/`tool_choice`, tool arguments that arrive as a JSON *string* (and the malformed
+variant that is preserved as `_raw` rather than dropped), `prompt_tokens_details.cached_tokens`
+versus DeepSeek's `prompt_cache_hit_tokens`, a 429 that must be retried without charging
+twice, and a 403 that must not be. The suite's network guard allows loopback and blocks
+everything else, so "offline by contract" stays true while the transport is still tested
+as transport.
+
 ## The offline surrogate
 
 `llm/surrogate.py` is a hand-written service-desk procedure with three properties that
