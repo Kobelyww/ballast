@@ -1,13 +1,14 @@
 PY ?= python
 PIP ?= pip
 
-.PHONY: help install test eval report skills gate lint smoke clean
+.PHONY: help install test eval report figure skills gate lint smoke clean
 
 help:
 	@echo "make install   pip install -e .[dev]"
 	@echo "make test      run the offline test suite (no key, no network)"
 	@echo "make eval      run the full 12-arm benchmark and write docs/BENCHMARK.md"
 	@echo "make report    render the stored benchmark as markdown"
+	@echo "make figure    redraw docs/figures/crossover.svg from the stored rows"
 	@echo "make skills    distill candidate skill cards from graded traces"
 	@echo "make gate      run the holdout promotion gate over the candidates"
 	@echo "make lint      byte-compile the tree (ruff if installed)"
@@ -27,6 +28,9 @@ eval:
 
 report:
 	PYTHONPATH=src $(PY) -m ballast.cli report bench/results/eval.json
+
+figure:
+	$(PY) scripts/plot_crossover.py bench/results/eval.json docs/figures/crossover.svg
 
 skills:
 	PYTHONPATH=src $(PY) -m ballast.cli skills distill

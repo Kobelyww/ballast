@@ -8,6 +8,7 @@ into something actionable: "arm X lost 4 runs, 3 of them `wrong_argument`, 1 of 
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -43,7 +44,12 @@ class Fault:
 
 def attribute(events: Sequence[dict[str, Any]], *, steps: int, status: str) -> list[Fault]:
     faults: list[Fault] = []
+    # Keyed by name *and* arguments: a batch run legitimately calls `get_ticket` 24
+    # times, and counting by name alone reported every long-horizon success as
+    # hundreds of `loop_detected` agent faults. Spinning is repeating the same call,
+    # not repeating the same tool.
     seen_calls: Counter[str] = Counter()
+    seen_signatures: Counter[str] = Counter()
 
     for event in events:
         payload = event.get("payload", {}) or {}
@@ -59,13 +65,20 @@ def attribute(events: Sequence[dict[str, Any]], *, steps: int, status: str) -> l
             if code in {"upstream_timeout"}:
                 faults.append(Fault("upstream_timeout", "environment", str(payload.get("detail", ""))[:200]))
         elif kind == "tool_call":
-            seen_calls[str(payload.get("name"))] += 1
+            name = str(payload.get("name"))
+            seen_calls[name] += 1
+            try:
+                shape = json.dumps(payload.get("arguments"), sort_keys=True, ensure_ascii=False, default=str)
+            except (TypeError, ValueError):
+                shape = str(payload.get("arguments"))
+            seen_signatures[f"{name}|{shape}"] += 1
         elif kind == "budget_abort":
             faults.append(Fault("budget_exhausted", "runtime", str(payload.get("detail", ""))[:200]))
 
-    for name, count in seen_calls.items():
+    for signature, count in seen_signatures.items():
         if count >= 4:
-            faults.append(Fault("loop_detected", "agent", f"{name} called {count} times"))
+            name = signature.split("|", 1)[0]
+            faults.append(Fault("loop_detected", "agent", f"{name} called {count} times with identical arguments"))
 
     if not seen_calls:
         faults.append(Fault("no_action_taken", "agent", "run produced no tool calls"))

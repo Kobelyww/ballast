@@ -9,7 +9,8 @@ Zero runtime dependencies · every test runs without an API key · auditable, re
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)
 ![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-yellow)
-![tests](https://img.shields.io/badge/benchmark-28%20tasks%20×%2011%20arms-blue)
+![tests](https://img.shields.io/badge/benchmark-58%20tasks%20×%2012%20arms-blue)
+![offline](https://img.shields.io/badge/tests-655%20offline%2C%20no%20API%20key-blueviolet)
 
 </div>
 
@@ -26,26 +27,22 @@ questions that actually decide whether you can run one in production:
 
 ## What the numbers say
 
-From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — **648 runs**: 29 after-sales tasks × 3
-repeats × 12 runtime arms, every arm paired against identical scenarios. Offline
-surrogate, zero API spend. Worked traces in [`docs/examples/traces.md`](docs/examples/traces.md).
+From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) and [`bench/results/eval.md`](bench/results/eval.md)
+— **1,116 runs**: 31 after-sales tasks × 3 repeats × 12 runtime arms, every arm paired
+against identical scenarios. Offline surrogate, zero API spend. Worked traces in
+[`docs/examples/traces.md`](docs/examples/traces.md).
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **183 refused payments** and success fell to **40% vs 100%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **99 times** and dropped to 68%, and `ops_reckless` (reverting a change-frozen deploy) was refused **51 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was ever crossed — the graded state never contains an unverified payment or page. |
-| **A failing agent is not a cheap agent** | `defective` spent **0.28× of a correct run [0.17, 0.63] while succeeding under a third as often**, and its pass^1→pass^3 collapses **30.2% → 9.1% → 2.8%**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand. |
-| **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch (control costs 7% more), 1.06× at 9, 1.24× at 12, **1.49× at 16 tickets (control saves a third)**. The break-even sits near a 250k-token transcript. Reproduce it in `docs/BENCHMARK.md#the-crossover`; the table is generated from stored rows, not written by hand. |
-| **The suite is sensitive enough to reverse its own headline** | Aggregated, `ballast` and `naive` both finish **100% of the 29 tasks** and naive costs 1.12× as much — but that CI [0.87, 1.25] spans 1.00, so the honest verdict is "probably cheaper, not proven". Split by scenario class it *does* resolve: context control is **~1.2× cheaper on long-horizon and bloated-payload tasks** and **~0.95× — i.e. more expensive — on ordinary short ones**, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
-| **Reliability decays where capability does not** | Under `pass^k`, `noisy` falls **76.7% → 58.9% → 45.2%** and `tight_budget` **90.7% → 82.3% → 74.6%** across three consecutive draws. A pass@1 demo cannot see either curve, and both are the number a reviewer will quote you. |
-| **Guardrails travel to a second domain** | SRE incidents, added without touching the kernel: `ops_unassessed` (pages without a policy assessment) is refused **57 times** and loses 20.9 points (p = 0.0039); `ops_reckless` (insists on reverting a change-frozen deploy) is refused **33 times** with **0 unauthorised rollbacks** across every frozen scenario. |
-| **Structured errors buy recovery** | The `noisy` arm produced **279 agent faults from malformed calls** (114 unknown arguments, 102 missing required ones, 63 spins caught by the repetition guard). Coerce-then-explain validation still converted that into **72.2% task success** (Δ −27.8 points, p = 0.063) — a raise-and-crash tool layer converts it into 0%. |
-| **Long horizons found us a real bug, and the arms localized it** | On the 12-ticket batch, `ballast` initially finished **8/12** while `naive` finished 12/12. Disabling *only* compaction recovered all 12; disabling *only* offloading changed nothing — which pointed straight at compaction folding away (a) the task instruction and (b) the record of which tickets were already closed. See below. |
-| **The environment is part of the score** | Fault attribution separates `agent` (303 in `noisy`) from `runtime` (budget aborts) from `environment` (upstream timeouts absorbed by retry), so a regression is assigned to the layer that caused it. |
-
-## The two bugs this benchmark found in itself
-
-Both are in `## The bug this benchmark found in itself` below; the second one is the
-crossover, which turned a feature argument into a curve.
+| **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **165 refused payments**, success **12.9% vs 96.8%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **66 times** and dropped to **70.7% vs 98.3%**, and `ops_reckless` (insisting on reverting a change-frozen deploy) was refused **34 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was ever crossed: the graded state contains no unverified payment and no unauthorised revert, in either domain. |
+| **A failing agent is not a cheap agent** | `defective` spent **0.06× of a correct run [0.04, 0.15] while succeeding 12.9% against 96.8%**, and its pass^1→pass^3 collapses **12.9% → 1.7% → 0.2%**. The "it errored, so we didn't pay for it" intuition is backwards: failure is mostly spend on a task you then redo by hand, and at three consecutive draws a 13% agent is a 0.2% agent. |
+| **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch and 0.95× at 6 (control costs 5-7% *more*), crossing 1.00 at `B09_batch_queue` ≈284k tokens, then **1.27× at 12, 1.29× at 16, 1.29× at 24, 1.34× at 36** — and still 1.22× at 48 tickets, where both arms stop at the budget ceiling rather than the window. The curve is drawn, not asserted: [![the cost crossover](docs/figures/crossover.svg)](docs/figures/crossover.svg). Regenerate with `scripts/plot_crossover.py bench/results/eval.json`; the table behind it in `docs/BENCHMARK.md#the-crossover` is built from stored rows, never by hand. |
+| **The suite is sensitive enough to settle its own headline** | The aggregate used to be inconclusive: naive at 1.12× ballast with CI [0.87, 1.25] — "probably cheaper, not proven". After the ladder the same comparison reads **1.50× [1.31, 1.58]**, and the class split still shows the sign flip that the aggregate hides: **1.51× [1.35, 1.60] on long-horizon tasks**, **0.95× [0.94, 0.95] on ordinary short ones** — i.e. the controlled arm costs ~5% *more* there, because a retrieved policy briefing is overhead when the answer was already in the window. That is a decision rule, not a score. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
+| **Reliability decays where capability does not** | Under `pass^k`, `noisy` falls **45.2% → 20.4% → 9.2%** and `tight_budget` **74.2% → 55.0% → 40.8%** across three consecutive draws, while both `naive` and `ballast` hold **96.8% → 93.7% → 90.6%**. A pass@1 demo cannot see either curve, and both are the number a reviewer will quote you. |
+| **Guardrails travel to a second domain** | SRE incidents, added without touching `kernel/`, `context/` or `llm/base.py`: `ops_unassessed` loses **27.6 points** (0 concordant / 16 discordant, p < 1e-4) at the *same* cost as the correct arm — 0.99× [0.97, 1.00] — so refusing to assess buys nothing even in tokens. `ops_reckless` loses 13.8 points (p = 0.0078) and is caught by the freeze policy every time. |
+| **Structured errors buy recovery** | The `noisy` arm produced **240 agent faults from malformed calls alone** (126 unknown arguments, 114 missing required ones). Coerce-then-explain validation still converted that into **45.2% task success** rather than a crash-per-call (Δ −51.6 points vs `ballast`, 0 concordant / 16 discordant, p < 1e-4) — a raise-and-crash tool layer converts the same defect into 0%. |
+| **The harness found four bugs in itself, and the arms localized each** | (1) On the 12-ticket batch `ballast` finished 8/12 where `naive` finished 12/12; disabling *only* compaction recovered all 12 — pinned task instruction and the `[RUN STATE]` block fixed it. (2) A `no_offload` variant scored 88.2% against `naive`'s 100%: re-fetched payloads were being evicted again, oscillating. (3) The 24/36/48-ticket ladder died at `stalled` with the digest claiming a search whose result it had deleted — see "The bug that reversed the hard tier". (4) Fault attribution counted `get_ticket`×24 in a successful batch run as 21 `loop_detected` agent faults; it now keys on arguments, and every healthy arm reports **0 agent faults**. |
+| **The environment is part of the score** | Fault attribution separates `agent` (248 malformed-call faults in `noisy`) from `runtime` (budget aborts: 24 in `tight_budget`) from `environment` (upstream timeouts absorbed by retry), and it keys on the *arguments* a tool was called with — counting by tool name alone reported 21 "loops" for a batch run that legitimately closed 24 tickets, and every healthy arm now reads **0 agent faults**. |
 
 ## The bug this benchmark found in itself
 
@@ -259,7 +256,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 614 tests, ~36 seconds, no API key, no external network
+make test     # 655 tests (13 skipped by design), ~2 min, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
