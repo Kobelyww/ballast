@@ -44,6 +44,9 @@ jobs:
           BALLAST_LLM_API_KEY: ""
         run: python -m pytest tests -q
 
+      - name: README figures must match the stored benchmark rows
+        run: python scripts/check_claims.py
+
       - name: Benchmark must run offline in CI
         run: |
           python -m ballast.cli eval \

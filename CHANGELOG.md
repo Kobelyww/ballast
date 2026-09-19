@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.0] - 2026-09-19
+
+README numbers stop being hand-maintained.
+
+- **`scripts/check_claims.py`** recomputes every headline figure in the README from
+  `bench/results/*.json` and fails if the prose disagrees — 17 claims today, wired into CI
+  as a step and into `make claims`. It found five drifted numbers on its first run (the
+  cross-domain ratio, the break-even task's ratio, and three figures the README had stopped
+  quoting accurately), which is the whole argument for the check existing.
+- The sensitivity row now states mean cost per arm and the peak-window contrast, so the
+  claim is checkable rather than decorative.
+
+This is the mechanical version of the lesson from 0.7.0: deriving a number once and then
+maintaining it in prose is how a stale claim survives a dozen commits.
+
 ## [0.8.0] - 2026-09-19
 
 Proving the reliability metric can see a thing — the counter-check to 0.7.0's retraction.
