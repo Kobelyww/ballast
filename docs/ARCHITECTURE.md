@@ -88,6 +88,21 @@ tool is in `offload_exempt` are pinned forward through compaction. This is the s
 most instructive bug found by the benchmark: it surfaced as `ballast` scoring 88.2%
 against `naive`'s 100%.
 
+### What an offloaded handle must still say
+
+Moving a tool result to scratch and leaving a handle is only safe if the handle carries
+enough for the next decision to *not* need the payload. It used to carry nothing, and a
+policy that cannot tell which record it holds re-issues the read — the re-read is
+offloaded too, so a long run pays for the same payload every step. The engine now leaves
+the record's scalar fields inline (`kept: {...}`), and retrieval is asked for at the point
+a decision is blocked on a specific record rather than swept for any handle in sight.
+
+`S20_oversized_manifest` is the test for this: one order record of 37,408 tokens against a
+32,000-token ceiling. Without offloading the run cannot even send its next request — both
+`naive` and `no_offload` abort two calls in, having done nothing. With it, `ballast` closes
+the ticket in eight calls and never re-reads. `python scripts/offload_sweep.py` prints the
+threshold curve that puts 6,000 in the middle of the only window where both tasks pass.
+
 ### What a digest is allowed to assert
 
 Folding a block out of the window does not delete its history: the digest keeps a

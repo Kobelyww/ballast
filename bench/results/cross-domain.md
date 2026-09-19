@@ -1,49 +1,49 @@
-_generated 2026-09-19T10:21:37 · provider `surrogate` · 1160 runs over 10 arms_
+_generated 2026-09-19T10:59:47 · provider `surrogate` · 1180 runs over 10 arms_
 
 ## Headline
 
 | arm | success | 95% CI | mean cost | mean prompt tok | peak ctx | calls | offloads | compactions | guardrails |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| `naive` | 98.3% (114/116) | [93.9%, 99.5%] | 0.5158 | 237743 | 32023 | 26.8 | 0 | 0 | 2 |
-| `ballast` | 100.0% (116/116) | [96.8%, 100.0%] | 0.2444 | 121478 | 9460 | 28.4 | 2 | 52 | 2 |
-| `defective` | 34.5% (40/116) | [26.5%, 43.5%] | 0.0311 | 16226 | 9467 | 8.6 | 2 | 0 | 154 |
-| `no_compaction` | 96.6% (112/116) | [91.5%, 98.7%] | 0.4310 | 203388 | 26502 | 25.5 | 2 | 4 | 2 |
-| `no_context_control` | 96.6% (112/116) | [91.5%, 98.7%] | 0.4306 | 203226 | 26502 | 25.4 | 0 | 4 | 2 |
-| `noisy` | 72.4% (84/116) | [63.7%, 79.7%] | 0.0320 | 15710 | 9912 | 9.1 | 2 | 4 | 2 |
-| `obedient` | 96.6% (112/116) | [91.5%, 98.7%] | 0.2444 | 121504 | 9460 | 28.4 | 2 | 52 | 6 |
-| `ops_reckless` | 86.2% (100/116) | [78.8%, 91.3%] | 0.2443 | 121453 | 9460 | 28.3 | 2 | 52 | 34 |
-| `ops_unassessed` | 72.4% (84/116) | [63.7%, 79.7%] | 0.2410 | 119862 | 9460 | 27.5 | 2 | 52 | 66 |
-| `tight_budget` | 84.5% (98/116) | [76.8%, 90.0%] | 0.0999 | 52665 | 9144 | 18.0 | 2 | 272 | 2 |
+| `naive` | 96.6% (114/118) | [91.6%, 98.7%] | 0.5071 | 233740 | 38258 | 26.4 | 0 | 0 | 2 |
+| `ballast` | 100.0% (118/118) | [96.8%, 100.0%] | 0.2395 | 118942 | 7654 | 28.0 | 4 | 52 | 2 |
+| `defective` | 33.9% (40/118) | [26.0%, 42.8%] | 0.0298 | 15474 | 6791 | 8.6 | 4 | 0 | 158 |
+| `no_compaction` | 96.6% (114/118) | [91.6%, 98.7%] | 0.4230 | 199464 | 26502 | 25.2 | 4 | 4 | 2 |
+| `no_context_control` | 94.9% (112/118) | [89.3%, 97.6%] | 0.4234 | 199814 | 38447 | 25.1 | 0 | 4 | 2 |
+| `noisy` | 74.6% (88/118) | [66.0%, 81.6%] | 0.0306 | 14880 | 7431 | 9.1 | 4 | 0 | 2 |
+| `obedient` | 96.6% (114/118) | [91.6%, 98.7%] | 0.2396 | 118969 | 7654 | 28.0 | 4 | 52 | 6 |
+| `ops_reckless` | 86.4% (102/118) | [79.1%, 91.5%] | 0.2394 | 118918 | 7654 | 28.0 | 4 | 52 | 34 |
+| `ops_unassessed` | 72.9% (86/118) | [64.2%, 80.1%] | 0.2362 | 117354 | 7654 | 27.2 | 4 | 52 | 66 |
+| `tight_budget` | 86.4% (102/118) | [79.1%, 91.5%] | 0.0973 | 51206 | 6786 | 17.8 | 4 | 268 | 2 |
 
 ## Reliability (pass^k on repeat draws)
 
 | arm | pass^1 | pass^2 | pass^3 |
 |---|---:|---:|---:|
-| `naive` | 98.3% | 96.6% | 94.9% |
+| `naive` | 96.6% | 93.3% | 90.2% |
 | `ballast` | 100.0% | 100.0% | 100.0% |
-| `defective` | 34.5% | 11.9% | 4.1% |
-| `no_compaction` | 96.6% | 93.2% | 90.0% |
-| `no_context_control` | 96.6% | 93.2% | 90.0% |
-| `noisy` | 72.4% | 52.4% | 38.0% |
-| `obedient` | 96.6% | 93.2% | 90.0% |
-| `ops_reckless` | 86.2% | 74.3% | 64.1% |
-| `ops_unassessed` | 72.4% | 52.4% | 38.0% |
-| `tight_budget` | 84.5% | 71.4% | 60.3% |
+| `defective` | 33.9% | 11.5% | 3.9% |
+| `no_compaction` | 96.6% | 93.3% | 90.2% |
+| `no_context_control` | 94.9% | 90.1% | 85.5% |
+| `noisy` | 74.6% | 55.6% | 41.5% |
+| `obedient` | 96.6% | 93.3% | 90.2% |
+| `ops_reckless` | 86.4% | 74.7% | 64.6% |
+| `ops_unassessed` | 72.9% | 53.1% | 38.7% |
+| `tight_budget` | 86.4% | 74.7% | 64.6% |
 
 ## Cost / quality frontier
 
 | arm | mean cost | success | dominates |
 |---|---:|---:|---|
-| `naive` | 0.5158 | 98.3% | — |
-| `ballast` | 0.2444 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `obedient` |
-| `defective` | 0.0311 | 34.5% | — |
-| `no_compaction` | 0.4310 | 96.6% | — |
-| `no_context_control` | 0.4306 | 96.6% | `no_compaction` |
-| `noisy` | 0.0320 | 72.4% | `ops_unassessed` |
-| `obedient` | 0.2444 | 96.6% | `no_compaction`, `no_context_control` |
-| `ops_reckless` | 0.2443 | 86.2% | — |
-| `ops_unassessed` | 0.2410 | 72.4% | — |
-| `tight_budget` | 0.0999 | 84.5% | `ops_unassessed` |
+| `naive` | 0.5071 | 96.6% | — |
+| `ballast` | 0.2395 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `obedient` |
+| `defective` | 0.0298 | 33.9% | — |
+| `no_compaction` | 0.4230 | 96.6% | `naive`, `no_context_control` |
+| `no_context_control` | 0.4234 | 94.9% | — |
+| `noisy` | 0.0306 | 74.6% | `ops_unassessed` |
+| `obedient` | 0.2396 | 96.6% | `naive`, `no_compaction`, `no_context_control` |
+| `ops_reckless` | 0.2394 | 86.4% | — |
+| `ops_unassessed` | 0.2362 | 72.9% | — |
+| `tight_budget` | 0.0973 | 86.4% | `ops_unassessed`, `ops_reckless` |
 
 ## Paired comparisons vs reference arm
 
@@ -51,15 +51,15 @@ Paired on identical scenarios against `ballast` (McNemar exact on discordant pai
 
 | comparison | Δ success | discordant b/c | p (exact) | effect h | cost ratio [95% CI] |
 |---|---:|---|---:|---:|---|
-| `naive` vs `ballast` | -0.017 | 0/1 | 1.0000 | -0.26 | 2.11 [1.34, 2.52] |
-| `defective` vs `ballast` | -0.655 | 0/38 | 0.0000 | -1.89 | 0.13 [0.08, 0.26] |
-| `no_compaction` vs `ballast` | -0.034 | 0/2 | 0.5000 | -0.37 | 1.76 [1.36, 2.01] |
-| `no_context_control` vs `ballast` | -0.034 | 0/2 | 0.5000 | -0.37 | 1.76 [1.36, 2.01] |
-| `noisy` vs `ballast` | -0.276 | 0/16 | 0.0000 | -1.11 | 0.13 [0.07, 0.30] |
+| `naive` vs `ballast` | -0.034 | 0/2 | 0.5000 | -0.37 | 2.12 [1.36, 2.54] |
+| `defective` vs `ballast` | -0.661 | 0/39 | 0.0000 | -1.90 | 0.12 [0.08, 0.25] |
+| `no_compaction` vs `ballast` | -0.034 | 0/2 | 0.5000 | -0.37 | 1.77 [1.37, 2.01] |
+| `no_context_control` vs `ballast` | -0.051 | 0/3 | 0.2500 | -0.45 | 1.77 [1.38, 2.01] |
+| `noisy` vs `ballast` | -0.254 | 0/15 | 0.0001 | -1.06 | 0.13 [0.07, 0.30] |
 | `obedient` vs `ballast` | -0.034 | 0/2 | 0.5000 | -0.37 | 1.00 [1.00, 1.00] |
-| `ops_reckless` vs `ballast` | -0.138 | 0/8 | 0.0078 | -0.76 | 1.00 [1.00, 1.00] |
-| `ops_unassessed` vs `ballast` | -0.276 | 0/16 | 0.0000 | -1.11 | 0.99 [0.97, 0.99] |
-| `tight_budget` vs `ballast` | -0.155 | 0/9 | 0.0039 | -0.81 | 0.41 [0.30, 0.66] |
+| `ops_reckless` vs `ballast` | -0.136 | 0/8 | 0.0078 | -0.75 | 1.00 [1.00, 1.00] |
+| `ops_unassessed` vs `ballast` | -0.271 | 0/16 | 0.0000 | -1.10 | 0.99 [0.97, 0.99] |
+| `tight_budget` vs `ballast` | -0.136 | 0/8 | 0.0078 | -0.75 | 0.41 [0.29, 0.65] |
 
 ## Where the savings actually come from
 
@@ -67,9 +67,9 @@ Aggregated over every scenario, the reference arm's cost ratio can hide its own 
 
 | scenario class | n | mean cost ballast | mean cost naive | naive/ballast cost | naive/ballast prompt tokens |
 |---|---:|---:|---:|---|---|
-| all scenarios | 58 | 0.2444 | 0.5158 | 2.11 [1.34, 2.52] | 1.96 [1.26, 2.33] |
+| all scenarios | 59 | 0.2395 | 0.5071 | 2.12 [1.36, 2.54] | 1.97 [1.28, 2.35] |
 | class: long_horizon | 12 | 1.0764 | 2.3947 | 2.22 [1.46, 2.67] | 2.07 [1.38, 2.46] |
-| class: bloat | 4 | 0.2375 | 0.2957 | 1.24 (n too small) | 1.17 (n too small) |
+| class: bloat | 5 | 0.1815 | 0.2373 | 1.31 [0.70, 1.71] | 1.25 [0.69, 1.86] |
 | class: restraint | 6 | 0.0196 | 0.0185 | 0.95 [0.94, 0.95] | 0.87 [0.86, 0.87] |
 | class: flaky | 1 | 0.0316 | 0.0301 | 0.95 (n too small) | 0.87 (n too small) |
 | class: retrieval | 1 | 0.0816 | 0.0801 | 0.98 (n too small) | 0.96 (n too small) |
@@ -102,12 +102,12 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 
 | arm | agent faults | runtime faults | environment faults | top codes |
 |---|---:|---:|---:|---|
-| `naive` | 0 | 2 | 8 | upstream_timeout×8, budget_exhausted×2 |
+| `naive` | 0 | 4 | 8 | upstream_timeout×8, budget_exhausted×4 |
 | `ballast` | 6 | 0 | 8 | upstream_timeout×8, loop_detected×6 |
 | `defective` | 0 | 0 | 6 | upstream_timeout×6 |
 | `no_compaction` | 0 | 4 | 8 | upstream_timeout×8, budget_exhausted×4 |
-| `no_context_control` | 0 | 4 | 8 | upstream_timeout×8, budget_exhausted×4 |
-| `noisy` | 252 | 0 | 6 | unknown_argument×130, missing_required_argument×122, upstream_timeout×6 |
+| `no_context_control` | 0 | 6 | 8 | upstream_timeout×8, budget_exhausted×6 |
+| `noisy` | 258 | 0 | 6 | unknown_argument×132, missing_required_argument×126, upstream_timeout×6 |
 | `obedient` | 6 | 0 | 8 | upstream_timeout×8, loop_detected×6 |
 | `ops_reckless` | 6 | 0 | 8 | upstream_timeout×8, loop_detected×6 |
 | `ops_unassessed` | 6 | 0 | 6 | upstream_timeout×6, loop_detected×6 |
@@ -172,6 +172,7 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | S14_flaky_upstream | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | S15_context_bloat | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | S16_queue_dig | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| S17_fat_order | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| S17_fat_order | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | S18_batch_queue | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | S19_batch_twelve | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| S20_oversized_manifest | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |

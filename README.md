@@ -9,7 +9,7 @@ Zero runtime dependencies · every test runs without an API key · auditable, re
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)
 ![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-yellow)
-![tests](https://img.shields.io/badge/benchmark-58%20tasks%20×%2012%20arms-blue)
+![tests](https://img.shields.io/badge/benchmark-59%20tasks%20×%2012%20arms-blue)
 ![offline](https://img.shields.io/badge/tests-655%20offline%2C%20no%20API%20key-blueviolet)
 
 </div>
@@ -28,21 +28,21 @@ questions that actually decide whether you can run one in production:
 ## What the numbers say
 
 From [`docs/BENCHMARK.md`](docs/BENCHMARK.md) and [`bench/results/eval.md`](bench/results/eval.md)
-— **1,116 runs**: 31 after-sales tasks × 3 repeats × 12 runtime arms, every arm paired
+— **1,152 runs**: 32 after-sales tasks × 3 repeats × 12 runtime arms, every arm paired
 against identical scenarios. Offline surrogate, zero API spend. Worked traces in
 [`docs/examples/traces.md`](docs/examples/traces.md).
 
 | Finding | Evidence |
 |---|---|
-| **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **165 refused payments**, success **12.9% against the controlled arm's 100.0%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **66 times** and fell to **72.4%**, and `ops_reckless` (insisting on reverting a change-frozen deploy) was refused **34 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was crossed in either direction: the graded state contains no unverified payment and no unauthorised revert. |
-| **A failing agent is not a cheap agent** | `defective` spent **0.08× of a correct run [0.05, 0.17] while succeeding 12.9% against 100.0%**, and its pass^1→pass^3 collapses **12.9% → 1.7% → 0.2%**. The "it errored, so we didn't pay for it" intuition is backwards: a cheap failure is a task you redo by hand, and at three consecutive draws a 13% agent is a 0.2% agent. |
+| **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **171 refused payments**, success **12.5% against the controlled arm's 100.0%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **66 times** and fell to **72.4%**, and `ops_reckless` (insisting on reverting a change-frozen deploy) was refused **34 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was crossed in either direction: the graded state contains no unverified payment and no unauthorised revert. |
+| **A failing agent is not a cheap agent** | `defective` spent **0.08× of a correct run [0.05, 0.16] while succeeding 12.5% against 100.0%**, and its pass^1→pass^3 collapses **12.5% → 1.7% → 0.2%**. The "it errored, so we didn't pay for it" intuition is backwards: a cheap failure is a task you redo by hand, and at three consecutive draws a 13% agent is a 0.2% agent. |
 | **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch and 0.95× at 6 (the controlled arm costs 5-7% *more*), crossing 1.00 at `B09_batch_queue` ≈284k tokens, then **1.27× at 12, 1.69× at 16, 2.07× at 24, 3.01× at 36** — at 36 tickets the uncontrolled run pays three times as much for the same 36/36. The curve is drawn from stored rows: [![the cost crossover](docs/figures/crossover.svg)](docs/figures/crossover.svg) (`make figure`). |
-| **The suite is sensitive enough to settle its own headline** | The aggregate used to be undecidable: naive at 1.12× ballast, CI [0.87, 1.25] — "probably cheaper, not proven". It now reads **2.17× [1.39, 2.61]** across both domains (2.11× [1.34, 2.52] on the 58-task cross-domain suite), and the class split still shows the sign flip the aggregate hides: **2.22× [1.46, 2.67] on long-horizon tasks** against **0.95× [0.94, 0.95] on ordinary short ones**, where a retrieved policy briefing really is overhead. That is a decision rule, not a score: run `naive` for short tasks, and stop running it for long ones. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
-| **Reliability decays where capability does not** | Under `pass^k` — three consecutive draws of the same task — `ballast` holds **100% → 100% → 100%** while `naive` slides **96.8% → 93.7% → 90.6%**, `noisy` falls **48.4% → 23.4% → 11.3%** and `tight_budget` **71.0% → 50.4% → 35.7%**. A pass@1 demo cannot see any of those curves, and a reviewer will quote the third number, not the first. |
-| **Guardrails travel to a second domain** | SRE incidents, added without touching `kernel/`, `context/` or `llm/base.py`: `ops_unassessed` loses **27.6 points** (0 concordant / 16 discordant, p < 1e-4) at *the same cost* as the correct arm — 0.99× [0.97, 0.99] — so skipping the assessment buys nothing even in tokens. `ops_reckless` loses 13.8 points (p = 0.0078) and the freeze policy catches it every time. |
-| **Structured errors buy recovery** | The `noisy` arm produced **240 agent faults from malformed calls alone** (126 unknown arguments, 114 missing required ones). Coerce-then-explain validation still converted that into **48.4% task success** instead of a crash-per-call (Δ −51.6 points vs `ballast`, 0 concordant / 16 discordant, p < 1e-4) — a raise-and-crash tool layer converts the same defect into 0%. |
+| **The suite is sensitive enough to settle its own headline** | The aggregate used to be undecidable: naive at 1.12× ballast, CI [0.87, 1.25] — "probably cheaper, not proven". It now reads **2.18× [1.43, 2.60]** on the desk suite and 2.11× [1.34, 2.52] across both domains, at *higher* success (100.0% vs 93.8%). Two honest caveats the table cannot hide: on the 2 discordant tasks McNemar gives p = 0.50, so the *success* gap is not yet significant — only the cost gap is; and the class split still flips sign, **0.95× [0.94, 0.95] on ordinary short tasks**, where the briefing really is overhead. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
+| **Reliability decays where capability does not** | Under `pass^k` — three consecutive draws of the same task — `ballast` holds **100% → 100% → 100%** while `naive` slides **93.8% → 87.9% → 82.4%**, `noisy` falls **53.1% → 28.2% → 15.0%** and `tight_budget` **75.0% → 56.2% → 42.2%**. A pass@1 demo cannot see any of those curves, and a reviewer will quote the third number, not the first. |
+| **Guardrails travel to a second domain** | SRE incidents, added without touching `kernel/`, `context/` or `llm/base.py`: `ops_unassessed` loses **27.1 points** (0 concordant / 16 discordant, p < 1e-4) at *the same cost* as the correct arm — 0.99× [0.97, 0.99] — so skipping the assessment buys nothing even in tokens. `ops_reckless` loses 13.6 points (p = 0.0078) and the freeze policy catches it every time. |
+| **Structured errors buy recovery** | The `noisy` arm produced **255 agent faults from malformed calls alone** (132 unknown arguments, 123 missing required ones). Coerce-then-explain validation still converted that into **53.1% task success** instead of a crash-per-call (Δ −46.9 points vs `ballast`, 0 concordant / 15 discordant, p = 1e-4) — a raise-and-crash tool layer converts the same defect into 0%. |
 | **The harness found five bugs in itself, and the arms localized each** | (1) On the 12-ticket batch `ballast` finished 8/12 where `naive` finished 12/12; disabling *only* compaction recovered all 12 — pinned task instruction and the `[RUN STATE]` block fixed it. (2) A `no_offload` variant scored 88.2% against `naive`'s 100%: re-fetched payloads were being evicted again, oscillating. (3) The 24/36/48-ticket ladder died at `stalled` with the digest claiming a search whose result it had deleted. (4) Attribution charged the run for pre-resolved decoy tickets and for `get_ticket`×24. (5) **The last known failure was a default we had never measured** — see "The hard tier, and what actually caused it". |
-| **The environment is part of the score** | Fault attribution separates `agent` (240 malformed-call faults in `noisy`) from `runtime` (408 compactions and 9 budget aborts in `tight_budget`) from `environment` (upstream timeouts absorbed by retry), and keys on the *arguments* a tool was called with — counting by tool name alone once charged a batch run 21 "loops" for legitimately closing 24 tickets. It is not flattered by its own honesty: the controlled arm still reports **9 agent faults** of its own. |
+| **The environment is part of the score** | Fault attribution separates `agent` (255 malformed-call faults in `noisy`) from `runtime` (402 compactions and 9 budget aborts in `tight_budget`) from `environment` (upstream timeouts absorbed by retry), and keys on the *arguments* a tool was called with — counting by tool name alone once charged a batch run 21 "loops" for legitimately closing 24 tickets. It is not flattered by its own honesty: the controlled arm still reports **9 agent faults** of its own. |
 
 ## The bug this benchmark found in itself
 
@@ -135,13 +135,16 @@ became a permanent addition to the window — the run carried the payload for th
 life and spent its budget on the carry:
 
 ```
-$ python scripts/offload_sweep.py          # 15 payload-heavy train tasks
- threshold    pass     cost  prompt tok  offloads  failures
+ threshold    pass     cost  prompt tok  offloads  failures      (at v0.5.0)
        off   15/15    13.07       6.50M          0  —
       1200   14/15    19.18      10.47M          6  L48_batch:budget_aborted
-      2000   14/15    18.17       9.81M          4  L48_batch:budget_aborted
       6000   15/15    13.07       6.50M          0  —
 ```
+
+That table is a snapshot of a commit, not a standing truth: the next section changes the
+mechanism it measures, and `python scripts/offload_sweep.py` now prints something
+different. Reproducible numbers go stale on purpose in this repo — the script, the stored
+output and the commit that produced them are all in the tree.
 
 The default is now 6,000, with that table quoted in the comment next to it. `L48_batch`
 finishes **48/48 in ¥3.29**, the controlled arm is **100% across all 93 desk runs and all
@@ -153,6 +156,52 @@ plausible story is not evidence of a cause. And the interaction that produced it
 to neither mechanism alone: offload says "big results go out", compaction says "pinned
 things stay", and only a run long enough to hit a budget ceiling reveals what those two
 agree on.
+
+## Offload, from tax to load-bearing
+
+Raising the threshold to 6,000 made offloading harmless. Harmless is not the same as
+useful, and the honest next question was whether the mechanism had ever *earned* its
+place. It had not: every payload-heavy task in the suite fit inline, so the only thing the
+benchmark could say about offloading was that it cost round trips.
+
+So the suite grew the case the mechanism exists for. `S20_oversized_manifest` is one
+`get_order` call that returns **37,408 tokens against a 32,000-token ceiling** — a single
+record bigger than the window it is being read into.
+
+| arm | outcome | calls | peak window | cost |
+| --- | --- | ---: | ---: | ---: |
+| `naive` | `budget_aborted`, nothing done | 2 | 38,258 | ¥0.00 |
+| `no_offload` | `budget_aborted`, nothing done | 2 | 38,447 | ¥0.00 |
+| `ballast` | **refund issued, ticket closed** | 8 | **2,562** | ¥0.03 |
+
+The uncontrolled arms do not fail because the agent is weak. They fail because the *next
+request is unsendable*: the transcript now contains a record that exceeds the window, so
+no policy — good or bad — can be applied to it. That is a class of failure context
+engineering exists to prevent, and until this task existed, nothing in the repo proved it.
+
+The sweep, re-run after that change (`bench/results/offload-sweep.txt`), is the whole
+argument for where the default sits:
+
+```
+ threshold     pass     cost  prompt tok   calls  offloads  failures
+       off    15/16    13.10       6.52M    1290         0  S20_oversized_manifest:budget_aborted
+      1200    15/16    12.84       6.29M    1289         7  S16_queue_dig:stalled
+      3000    15/16    12.98       6.41M    1291         4  S16_queue_dig:stalled
+      6000    16/16    13.08       6.49M    1296         2  —
+      9000    16/16    13.12       6.53M    1296         1  —
+```
+
+Turn the mechanism off and a task fails. Leave it where it was and a *different* task
+fails. Only the middle setting clears the deck — which is the most useful thing a
+benchmark can tell you about a default: not that it is good, but where it breaks.
+
+Getting there needed a contract change, not just a threshold. An offloaded record used to
+come back as a handle with nothing else, and a policy that cannot tell *which* record it
+holds re-issues the read — the re-read is offloaded too, and the run pays for the same
+payload every step. Now the engine leaves the record's scalar fields inline (`kept: {...}`)
+and the policy pages for the bulk only at the point a decision is actually blocked on it.
+On `S17_fat_order` that is the difference between "offload costs a round trip" and
+"offload costs nothing and saves two thirds of the prompt tokens".
 
 ## Prompt injection: what the runtime can and cannot promise
 
@@ -235,14 +284,15 @@ statistics changed — only what "too expensive" means.
 
 Read these before trusting the table above; they are the interesting part.
 
-- **The aggregate is now decisive, and still the wrong thing to quote.** Across 1,116 desk
-  runs `ballast` costs **2.17× less [1.39, 2.61]** than `naive` at *higher* task success
-  (100.0% vs 96.8%), and the 58-task cross-domain suite agrees (2.11× [1.34, 2.52]). That is
-  a proven saving where the same comparison read 1.12× [0.87, 1.25] a few commits ago — it
-  moved because the deck grew long enough to weight the class context control is for, not
-  because the estimator changed. Quote the class table, not the aggregate: the aggregate is
-  dominated by 12 long-horizon tasks and hides the sign flip on the other 19. Intervals are
-  suppressed below five paired tasks rather than printed as confident-looking noise.
+- **The aggregate is now decisive, and still the wrong thing to quote.** Across 1,152 desk
+  runs `ballast` costs **2.18× less [1.43, 2.60]** than `naive` at *higher* task success
+  (100.0% vs 93.8%), and the cross-domain suite agrees. That is a proven saving where the
+  same comparison read 1.12× [0.87, 1.25] a few commits ago — it moved because the deck grew
+  long enough to weight the class context control is for, not because the estimator changed.
+  The *success* gap is not yet significant (0/2 discordant, p = 0.50); the cost gap is.
+  Quote the class table, not the aggregate: the aggregate is dominated by 12 long-horizon
+  tasks and hides the sign flip on the other 20. Intervals are suppressed below five paired
+  tasks rather than printed as confident-looking noise.
 - **Short tasks are cheaper without any of this.** Below ~284k prompt tokens of total
   transcript the controlled arm costs 5–7% *more* (0.95× [0.94, 0.95] on ordinary tasks),
   because a retrieved policy briefing is overhead when the answer was already in the window.

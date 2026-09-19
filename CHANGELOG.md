@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.6.0] - 2026-09-19
+
+Offloading stops being a tax and becomes the mechanism that saves a run.
+
+### Changed
+
+- **An offloaded record keeps its identity.** `ContextEngine.tool_result` now leaves the
+  JSON record's scalar fields inline (`kept: {...}`) when it moves the bulk to scratch.
+  A handle that does not say *which* record it points at is worse than no handle: the
+  policy cannot tell whether it already holds what the next decision needs, so it
+  re-issues the read, the re-read is offloaded too, and the run pays for the same payload
+  every step. That loop is what 0.5.0 measured as "+47% cost for zero benefit".
+- **Retrieval is need-driven.** `SurrogatePolicy` pages for a handle only at the point a
+  decision is blocked on that record (`_Transcript.reread_for`), never by sweeping for
+  handles it can find.
+
+### Added
+
+- **`S20_oversized_manifest`**: one `get_order` returning 37,408 tokens against a
+  32,000-token ceiling — the case offloading exists for, which the suite did not contain.
+  `naive` and `no_offload` abort two calls in having done nothing; `ballast` offloads once,
+  needs no re-read, and closes the ticket in 8 calls at ¥0.03 with a 2.5k-token peak.
+- `bench/results/offload-sweep.txt` stores the sweep output beside the script that made it.
+- Three ablation tests rewritten to the new contract (same call count, a third of the
+  prompt tokens, no retrieval), plus a unit test that an offloaded record both keeps its
+  scope and still pages.
+
+### Measured
+
+`ballast` **100.0% (96/96 desk, 118/118 cross-domain)** against `naive` 93.8% / 96.6%, at
+**2.18× less cost [1.43, 2.60]**. The sweep now has a genuine optimum: with offloading off
+`S20` fails, at 1,200 `S16_queue_dig` stalls, and only 6,000 clears all 16 payload-heavy
+tasks. The success gap is *not* yet significant (0/2 discordant, p = 0.50) and the README
+says so; the cost gap is.
+
 ## [0.5.0] - 2026-09-19
 
 The suite's last known failure turned out to be a default we had never measured.

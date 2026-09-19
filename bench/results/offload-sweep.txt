@@ -1,0 +1,16 @@
+16 payload-heavy train tasks, arm `ballast` with the threshold varied
+
+ threshold     pass     cost  prompt tok   calls  offloads  failures
+       off    15/16    13.10       6.52M    1290         0  S20_oversized_manifest:budget_aborted
+      1200    15/16    12.84       6.29M    1289         7  S16_queue_dig:stalled
+      2000    15/16    12.93       6.37M    1290         5  S16_queue_dig:stalled
+      3000    15/16    12.98       6.41M    1291         4  S16_queue_dig:stalled
+      6000    16/16    13.08       6.49M    1296         2  —
+      9000    16/16    13.12       6.53M    1296         1  —
+
+Reading: a threshold that fires below the window's own budget converts one big read
+into a pinned re-fetch the run then carries forever — which is why the low settings
+cost more than turning the mechanism off. What this suite cannot yet show is the case
+the mechanism exists for: a single result larger than the whole window, where an
+inline read is not merely expensive but impossible. That needs field-scoped re-reads
+(offset/limit paging that stays parseable), tracked as a follow-up.
