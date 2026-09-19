@@ -13,6 +13,7 @@ from ballast.bench.stats import (
     multiple_comparisons,
     paired_ratio_ci,
     pass_k,
+    pass_k_measured,
     success_rate_ci,
     wilson_interval,
 )
@@ -226,3 +227,19 @@ class TestInterval:
 
     def test_dict_rounding_is_display_facing(self) -> None:
         assert Interval(1.23456789, 0.987654321, 1.5).as_dict() == {"point": 1.2346, "low": 0.9877, "high": 1.5}
+
+
+def test_measured_pass_k_refuses_to_invent_a_decay() -> None:
+    """A deterministic agent repeats itself, so repetition proves nothing.
+
+    `pass_k` assumes independent draws and is a *model*; `pass_k_measured` counts tasks
+    that pass all of their first k draws and is a *measurement*. Under this repo's offline
+    surrogate they disagree by construction, and the report prints both because hiding that
+    is how a fabricated reliability curve ended up in a README once.
+    """
+    draws = [[True] * 5, [False] * 5, [True] * 5, [False] * 5]
+    assert pass_k_measured(draws, 1) == pytest.approx(0.5)
+    assert pass_k_measured(draws, 3) == pytest.approx(0.5)  # no decay: the draws are copies
+    assert pass_k(2, 4, 3) == pytest.approx(0.5**3)  # the same data, modelled: a curve appears
+    assert pass_k_measured([[True, False], [True, True]], 2) == pytest.approx(0.5)
+    assert pass_k_measured([[True]], 2) == 0.0  # a task with too few draws cannot pass k of them

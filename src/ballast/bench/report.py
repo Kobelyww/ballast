@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any
 
-from ..bench.stats import cohen_h, mcnemar_exact, paired_ratio_ci, pass_k, wilson_interval
+from ..bench.stats import cohen_h, mcnemar_exact, paired_ratio_ci, pass_k_measured, wilson_interval
 from .runner import SuiteResult
 
 
@@ -46,21 +46,34 @@ def markdown(result: SuiteResult, *, baseline: str = "naive", reference: str = "
 
     lines.append("## Reliability (pass^k on repeat draws)")
     lines.append("")
-    lines.append("| arm | pass^1 | pass^2 | pass^3 |")
-    lines.append("|---|---:|---:|---:|")
+    ks = (1, 2, 3)
+    lines.append("| arm | " + " | ".join(f"measured pass^{k}" for k in ks) + " | i.i.d. pass^3 |")
+    lines.append("|---|---:|---:|---:|---:|")
+    reps = 1
     for arm_name in _ordered(arms, reference):
-        per_task = defaultdict(list)
+        per_task: dict[str, list[bool]] = defaultdict(list)
         for row in result.rows:
             if row.arm == arm_name:
-                per_task[row.scenario_id].append(row.ok)
-        reps = max((len(v) for v in per_task.values()), default=1)
-        rates = [sum(1 for v in per_task[s] if v) / len(per_task[s]) for s in per_task] or [0.0]
-        mean_rate = sum(rates) / len(rates)
-        cols = " | ".join(_pct(pass_k(1, 1, k) * 0 + mean_rate**k) for k in (1, 2, 3))
-        lines.append(f"| `{arm_name}` | {cols} |")
+                per_task[row.scenario_id].append(bool(row.ok))
+        draws = list(per_task.values())
+        reps = max((len(d) for d in draws), default=1)
+        measured = [pass_k_measured(draws, k) for k in ks]
+        rate = sum(sum(d) / len(d) for d in draws) / len(draws) if draws else 0.0
+        lines.append(
+            f"| `{arm_name}` | " + " | ".join(_pct(m) for m in measured) + f" | {_pct(rate ** 3)} |"
+        )
+    lines.append("")
+    lines.append(
+        "_**measured** is the share of tasks passing every one of their first k draws; **i.i.d.** is "
+        "the tau-bench estimate `p̂^k` that assumes draws are independent. Under this repo's offline "
+        "surrogate the two columns disagree on purpose: the policy is deterministic, so each task's "
+        "draws are identical and measured pass^k equals pass^1 exactly. The decay in the last column "
+        "is a model of a stochastic agent, not a measurement of this one — it becomes real data only "
+        "against a provider at temperature > 0._"
+    )
     if reps < 2:
         lines.append("")
-        lines.append("_reps < 2 in this run: pass^k is the point estimate of a single draw; use `--reps 3` for a real reliability curve._")
+        lines.append("_reps < 2 in this run: nothing is measurable beyond pass^1; use `--reps 3`._")
     lines.append("")
 
     lines.append("## Cost / quality frontier")

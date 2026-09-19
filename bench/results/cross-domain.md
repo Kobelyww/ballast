@@ -17,18 +17,20 @@ _generated 2026-09-19T10:59:47 · provider `surrogate` · 1180 runs over 10 arms
 
 ## Reliability (pass^k on repeat draws)
 
-| arm | pass^1 | pass^2 | pass^3 |
-|---|---:|---:|---:|
-| `naive` | 96.6% | 93.3% | 90.2% |
-| `ballast` | 100.0% | 100.0% | 100.0% |
-| `defective` | 33.9% | 11.5% | 3.9% |
-| `no_compaction` | 96.6% | 93.3% | 90.2% |
-| `no_context_control` | 94.9% | 90.1% | 85.5% |
-| `noisy` | 74.6% | 55.6% | 41.5% |
-| `obedient` | 96.6% | 93.3% | 90.2% |
-| `ops_reckless` | 86.4% | 74.7% | 64.6% |
-| `ops_unassessed` | 72.9% | 53.1% | 38.7% |
-| `tight_budget` | 86.4% | 74.7% | 64.6% |
+| arm | measured pass^1 | measured pass^2 | measured pass^3 | i.i.d. pass^3 |
+|---|---:|---:|---:|---:|
+| `naive` | 96.6% | 96.6% | 0.0% | 90.2% |
+| `ballast` | 100.0% | 100.0% | 0.0% | 100.0% |
+| `defective` | 33.9% | 33.9% | 0.0% | 3.9% |
+| `no_compaction` | 96.6% | 96.6% | 0.0% | 90.2% |
+| `no_context_control` | 94.9% | 94.9% | 0.0% | 85.5% |
+| `noisy` | 74.6% | 74.6% | 0.0% | 41.5% |
+| `obedient` | 96.6% | 96.6% | 0.0% | 90.2% |
+| `ops_reckless` | 86.4% | 86.4% | 0.0% | 64.6% |
+| `ops_unassessed` | 72.9% | 72.9% | 0.0% | 38.7% |
+| `tight_budget` | 86.4% | 86.4% | 0.0% | 64.6% |
+
+_**measured** is the share of tasks passing every one of their first k draws; **i.i.d.** is the tau-bench estimate `p̂^k` that assumes draws are independent. Under this repo's offline surrogate the two columns disagree on purpose: the policy is deterministic, so each task's draws are identical and measured pass^k equals pass^1 exactly. The decay in the last column is a model of a stochastic agent, not a measurement of this one — it becomes real data only against a provider at temperature > 0._
 
 ## Cost / quality frontier
 
@@ -176,3 +178,4 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | S18_batch_queue | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | S19_batch_twelve | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
 | S20_oversized_manifest | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+

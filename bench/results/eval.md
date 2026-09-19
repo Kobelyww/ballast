@@ -19,20 +19,22 @@ _generated 2026-09-19T10:57:06 · provider `surrogate` · 1152 runs over 12 arms
 
 ## Reliability (pass^k on repeat draws)
 
-| arm | pass^1 | pass^2 | pass^3 |
-|---|---:|---:|---:|
-| `naive` | 93.8% | 87.9% | 82.4% |
-| `ballast` | 100.0% | 100.0% | 100.0% |
-| `bloated` | 100.0% | 100.0% | 100.0% |
-| `defective` | 12.5% | 1.6% | 0.2% |
-| `hierarchical` | 100.0% | 100.0% | 100.0% |
-| `no_budget` | 100.0% | 100.0% | 100.0% |
-| `no_compaction` | 93.8% | 87.9% | 82.4% |
-| `no_context_control` | 90.6% | 82.1% | 74.4% |
-| `no_offload` | 96.9% | 93.8% | 90.9% |
-| `noisy` | 53.1% | 28.2% | 15.0% |
-| `static_briefing` | 100.0% | 100.0% | 100.0% |
-| `tight_budget` | 75.0% | 56.2% | 42.2% |
+| arm | measured pass^1 | measured pass^2 | measured pass^3 | i.i.d. pass^3 |
+|---|---:|---:|---:|---:|
+| `naive` | 93.8% | 93.8% | 93.8% | 82.4% |
+| `ballast` | 100.0% | 100.0% | 100.0% | 100.0% |
+| `bloated` | 100.0% | 100.0% | 100.0% | 100.0% |
+| `defective` | 12.5% | 12.5% | 12.5% | 0.2% |
+| `hierarchical` | 100.0% | 100.0% | 100.0% | 100.0% |
+| `no_budget` | 100.0% | 100.0% | 100.0% | 100.0% |
+| `no_compaction` | 93.8% | 93.8% | 93.8% | 82.4% |
+| `no_context_control` | 90.6% | 90.6% | 90.6% | 74.4% |
+| `no_offload` | 96.9% | 96.9% | 96.9% | 90.9% |
+| `noisy` | 53.1% | 53.1% | 53.1% | 15.0% |
+| `static_briefing` | 100.0% | 100.0% | 100.0% | 100.0% |
+| `tight_budget` | 75.0% | 75.0% | 75.0% | 42.2% |
+
+_**measured** is the share of tasks passing every one of their first k draws; **i.i.d.** is the tau-bench estimate `p̂^k` that assumes draws are independent. Under this repo's offline surrogate the two columns disagree on purpose: the policy is deterministic, so each task's draws are identical and measured pass^k equals pass^1 exactly. The decay in the last column is a model of a stochastic agent, not a measurement of this one — it becomes real data only against a provider at temperature > 0._
 
 ## Cost / quality frontier
 
@@ -159,3 +161,4 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | S18_batch_queue | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | S19_batch_twelve | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | S20_oversized_manifest | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ |
+

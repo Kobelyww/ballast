@@ -35,13 +35,13 @@ against identical scenarios. Offline surrogate, zero API spend. Worked traces in
 | Finding | Evidence |
 |---|---|
 | **Guardrails hold in both domains** | `defective` skipped the mandatory policy computation before moving money: **171 refused payments**, success **12.5% against the controlled arm's 100.0%**. In the incidents domain, `ops_unassessed` (paging without an assessment) was refused **66 times** and fell to **72.4%**, and `ops_reckless` (insisting on reverting a change-frozen deploy) was refused **34 times** with **zero unauthorised rollbacks** across every frozen scenario. No invariant was crossed in either direction: the graded state contains no unverified payment and no unauthorised revert. |
-| **A failing agent is not a cheap agent** | `defective` spent **0.08× of a correct run [0.05, 0.16] while succeeding 12.5% against 100.0%**, and its pass^1→pass^3 collapses **12.5% → 1.7% → 0.2%**. The "it errored, so we didn't pay for it" intuition is backwards: a cheap failure is a task you redo by hand, and at three consecutive draws a 13% agent is a 0.2% agent. |
+| **A failing agent is not a cheap agent** | `defective` spent **0.08× of a correct run [0.05, 0.16] while succeeding 12.5% against the controlled arm's 100.0%** — and it does so *reliably*: 12.5% at every draw, not by luck. The "it errored, so we didn't pay for it" intuition is backwards either way. A cheap failure is a task you redo by hand, and the i.i.d. estimate of three consecutive successes is 0.2%. |
 | **It prices its own features, and finds the crossover** | Prompt-token cost of `naive` relative to `ballast` is **not a constant**: 0.93× at a 4-ticket batch and 0.95× at 6 (the controlled arm costs 5-7% *more*), crossing 1.00 at `B09_batch_queue` ≈284k tokens, then **1.27× at 12, 1.69× at 16, 2.07× at 24, 3.01× at 36** — at 36 tickets the uncontrolled run pays three times as much for the same 36/36. The curve is drawn from stored rows: [![the cost crossover](docs/figures/crossover.svg)](docs/figures/crossover.svg) (`make figure`). |
 | **The suite is sensitive enough to settle its own headline** | The aggregate used to be undecidable: naive at 1.12× ballast, CI [0.87, 1.25] — "probably cheaper, not proven". It now reads **2.18× [1.43, 2.60]** on the desk suite and 2.11× [1.34, 2.52] across both domains, at *higher* success (100.0% vs 93.8%). Two honest caveats the table cannot hide: on the 2 discordant tasks McNemar gives p = 0.50, so the *success* gap is not yet significant — only the cost gap is; and the class split still flips sign, **0.95× [0.94, 0.95] on ordinary short tasks**, where the briefing really is overhead. See "Where the savings actually come from" in [docs/BENCHMARK.md](docs/BENCHMARK.md). |
-| **Reliability decays where capability does not** | Under `pass^k` — three consecutive draws of the same task — `ballast` holds **100% → 100% → 100%** while `naive` slides **93.8% → 87.9% → 82.4%**, `noisy` falls **53.1% → 28.2% → 15.0%** and `tight_budget` **75.0% → 56.2% → 42.2%**. A pass@1 demo cannot see any of those curves, and a reviewer will quote the third number, not the first. |
+| **A reliability claim we had to retract** | This table used to read `naive` **93.8% → 87.9% → 82.4%** under `pass^k` and present the decay as a measurement. It was not one. The report computed `p̂^k` — tau-bench's independent-draws estimate — under a heading that said "on repeat draws". The offline surrogate is deterministic, so **every draw of a task is identical** and measured pass^k equals pass^1 exactly: `naive` is 93.8% at k = 2, 3 and 5. Both numbers now sit in the table, labelled *measured* and *i.i.d.* What survives is the honest version: pass^k decay is a property of a stochastic agent, so measuring it needs a real provider at temperature > 0 — which is the experiment this harness exists to make cheap, not one it can fake. |
 | **Guardrails travel to a second domain** | SRE incidents, added without touching `kernel/`, `context/` or `llm/base.py`: `ops_unassessed` loses **27.1 points** (0 concordant / 16 discordant, p < 1e-4) at *the same cost* as the correct arm — 0.99× [0.97, 0.99] — so skipping the assessment buys nothing even in tokens. `ops_reckless` loses 13.6 points (p = 0.0078) and the freeze policy catches it every time. |
 | **Structured errors buy recovery** | The `noisy` arm produced **255 agent faults from malformed calls alone** (132 unknown arguments, 123 missing required ones). Coerce-then-explain validation still converted that into **53.1% task success** instead of a crash-per-call (Δ −46.9 points vs `ballast`, 0 concordant / 15 discordant, p = 1e-4) — a raise-and-crash tool layer converts the same defect into 0%. |
-| **The harness found five bugs in itself, and the arms localized each** | (1) On the 12-ticket batch `ballast` finished 8/12 where `naive` finished 12/12; disabling *only* compaction recovered all 12 — pinned task instruction and the `[RUN STATE]` block fixed it. (2) A `no_offload` variant scored 88.2% against `naive`'s 100%: re-fetched payloads were being evicted again, oscillating. (3) The 24/36/48-ticket ladder died at `stalled` with the digest claiming a search whose result it had deleted. (4) Attribution charged the run for pre-resolved decoy tickets and for `get_ticket`×24. (5) **The last known failure was a default we had never measured** — see "The hard tier, and what actually caused it". |
+| **The harness found six bugs in itself, and the arms localized each** | (1) On the 12-ticket batch `ballast` finished 8/12 where `naive` finished 12/12; disabling *only* compaction recovered all 12 — pinned task instruction and the `[RUN STATE]` block fixed it. (2) A `no_offload` variant scored 88.2% against `naive`'s 100%: re-fetched payloads were being evicted again, oscillating. (3) The ladder died at `stalled` with the digest claiming a search whose result it had deleted. (4) Attribution charged the run for pre-resolved decoy tickets and for `get_ticket`×24. (5) The last known failure was an unmeasured offload threshold. (6) **A headline reliability curve turned out to be an assumption** — see the row above. |
 | **The environment is part of the score** | Fault attribution separates `agent` (255 malformed-call faults in `noisy`) from `runtime` (402 compactions and 9 budget aborts in `tight_budget`) from `environment` (upstream timeouts absorbed by retry), and keys on the *arguments* a tool was called with — counting by tool name alone once charged a batch run 21 "loops" for legitimately closing 24 tickets. It is not flattered by its own honesty: the controlled arm still reports **9 agent faults** of its own. |
 
 ## The bug this benchmark found in itself
@@ -298,7 +298,11 @@ Read these before trusting the table above; they are the interesting part.
   because a retrieved policy briefing is overhead when the answer was already in the window.
   If your agent handles one ticket per context, run `naive`. The crossover figure is what
   tells you which world you are in, and it is measured here rather than asserted.
-- **Everything passes except the arms designed to fail.** A suite the healthy arm scores
+- **`pass^k` is flat here, and that is the finding.** A deterministic stand-in cannot show
+  run-to-run decay; the i.i.d. column in the report is a model, clearly labelled, and the
+  only reason to run this suite against a real provider at temperature > 0 is to replace it
+  with measurement. Until then no claim about *reliability under repetition* is supported.
+- **Everything passes except the arms designed to fail.**
   100% on is a mechanism test, not a difficulty ceiling: the discriminating signal comes
   from the deliberately defective arms and from cost. That is now a *liability* of the
   result — `HARD_TIER` is empty because every failure so far turned out to be ours — and
@@ -318,10 +322,12 @@ Read these before trusting the table above; they are the interesting part.
   sit there with a `budget_aborted` at 39/48 and the README called it a budget wall. It was
   an offload threshold. See "The hard tier, and what actually caused it": the measurement
   was right, the causal story was not, and the fix was a sweep nobody had run.
-- **Every ladder cell is 3 draws of one deterministic policy.** The surrogate has no model
-  variance, so a `pass^3` interval here measures run-to-run harness variation only, and the
-  ladder's ratios (0.93× → 3.01×) are properties of the context machinery and the deck, not
-  of any language model.
+- **Every ladder cell is 3 identical draws of one deterministic policy.** There is no
+  run-to-run variance to measure here — which is why the report now prints measured and
+  i.i.d. `pass^k` side by side instead of quietly using the model. The ladder's ratios
+  (0.93× → 3.01×) are properties of the context machinery and the deck, not of any language
+  model.
+
 - Skill-card *utility* is simulated through machine-readable triggers the surrogate is
   *made* to obey; with a real provider the same gate measures actual instruction
   following, but that transfer is not yet demonstrated.

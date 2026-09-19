@@ -55,6 +55,20 @@ def pass_k(successes: int, n: int, k: int = 1) -> float:
     return (successes / n) ** k
 
 
+def pass_k_measured(draws: Sequence[Sequence[bool]], k: int) -> float:
+    """Fraction of tasks that pass *every* of their first k draws.
+
+    The honest sibling of `pass_k`, which assumes draws are independent. That assumption
+    is not cosmetic: with a deterministic stand-in policy every draw of a task is
+    identical, so the measured value equals pass^1 and any decay it predicts is a property
+    of the model, not of the agent. Report the measurement; label the estimate.
+    """
+    usable = [d for d in draws if len(d) >= k]
+    if not usable:
+        return 0.0
+    return sum(1 for d in usable if all(d[:k])) / len(usable)
+
+
 def success_rate_ci(successes: int, n: int) -> Interval:
     low, high = wilson_interval(successes, n)
     return Interval(successes / n if n else 0.0, low, high)

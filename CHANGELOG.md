@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+- **A reliability claim retracted.** The report's `pass^k` table was headed "on repeat
+  draws" but computed `p̂^k`, tau-bench's independent-draws estimate. The offline surrogate
+  is deterministic, so every draw of a task is identical and the measured value equals
+  pass^1 — the published decay (`naive` 93.8% → 87.9% → 82.4%, `defective` 12.5% → 1.7% →
+  0.2%) was a model of a stochastic agent, not a measurement of this one.
+  `stats.pass_k_measured()` is now the headline column and the estimate sits beside it,
+  labelled. The README row that sold the curve is replaced with the retraction, and the
+  honest consequence is stated as a limit: no claim about reliability under repetition is
+  supported until this runs against a provider at temperature > 0.
+
 
 - **Worked trace pair for `S20_oversized_manifest`** in `docs/examples/traces.md`: the same
   task on `ballast` (8 calls, 2.5k-token peak, refund closed, no `read_scratch` at all) and
