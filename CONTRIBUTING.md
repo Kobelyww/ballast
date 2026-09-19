@@ -6,7 +6,7 @@ Everything runs offline, so a useful contribution needs no API key.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 python -m pytest tests -q                                  # no network, no keys
-python -m ballast.cli eval --arms ballast,naive --reps 2    # ~20s
+python -m ballast.cli eval --arms ballast,naive --reps 2    # ~35s, 64 runs
 ```
 
 ## Three ways to help

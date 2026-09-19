@@ -380,12 +380,18 @@ src/ballast/
   kernel/      agent loop, toolkit w/ schema inference + argument repair, budgets,
                checkpoints, HITL gate, deterministic invariant checker
   memory/      episodic store, skill library, distiller, statistical promotion gate
-  env/         simulated after-sales world (SQLite), policy engine, SOP corpus, tasks
+  env/         simulated worlds (SQLite) for two domains — after-sales and SRE
+               incidents — with their policy engines, corpora, faults and task decks
+  tools/       the domain toolkits the toolkit layer wraps: desk and ops
   bench/       arms, runner, graders, fault taxonomy, pass^k / McNemar / bootstrap
+  cli.py       run / resume / eval / report / skills / gate / arms / doctor
 ```
 
-Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) (design rationale + the OSS it stands on) ·
+Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) (design rationale) ·
+[PRIOR_ART](docs/PRIOR_ART.md) (what each borrowed mechanism cost, and one row for a
+mechanism we do not implement) ·
 [BENCHMARK](docs/BENCHMARK.md) (full tables) ·
+[Worked traces](docs/examples/traces.md) ·
 [CONTRIBUTING](CONTRIBUTING.md)
 
 ## Why "ballast"
