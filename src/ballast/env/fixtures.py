@@ -514,6 +514,49 @@ def scenarios() -> list[Scenario]:
             tags=["bloat"],
         )
     )
+    # One tool result bigger than the whole context window. Nothing else in the suite
+    # exercises that case, and without it offloading is unmeasurable: every other
+    # payload-heavy task fits inline, which is why the threshold sweep could only show
+    # offloading costing money and never show it earning any.
+    out.append(
+        Scenario(
+            id="S20_oversized_manifest",
+            title="超出上下文的 420 件装箱清单",
+            skill_family="missing_item",
+            difficulty="expert",
+            brief="工单 T1062：整柜到货少发一件，缺的是 SKU-PAL-377。装箱清单很长，只退缺件那一件。",
+            fixture=_f(
+                customers=[customer("C122", tier="GOLD")],
+                orders=[order("SO20261062", "C122", paid=round(420 * 39.0, 2))],
+                order_items=[
+                    item(
+                        f"IP{i}",
+                        "SO20261062",
+                        sku=f"SKU-PAL-{i}",
+                        name=f"整柜调拨商品{i}，含原厂配件两份、安装说明书、保修卡与质检单，默认规格，托盘编号 P{i // 30}",
+                        price=39.0,
+                        qty=1,
+                        delivered=1 if i != 377 else 0,
+                    )
+                    for i in range(1, 421)
+                ],
+                shipments=[
+                    shipment(
+                        "SO20261062",
+                        delivered="2026-05-16T12:00:00",
+                        shipped="2026-05-10T08:00:00",
+                        events=[
+                            {"at": f"2026-05-{10 + (j % 6):02d}T{j % 24:02d}:00:00", "where": f"转运节点{j}，集装箱封条号 CN{j:06d}，称重与查验记录若干"}
+                            for j in range(1, 61)
+                        ],
+                    )
+                ],
+                tickets=[ticket("T1062", "C122", "SO20261062", "少发了一件，缺件退款 SKU-PAL-377")],
+            ),
+            expect={"outcome": "refund", "amount": 39.0, "ticket_status": "resolved", "hitl": True, "claim_type": "missing_item"},
+            tags=["bloat"],
+        )
+    )
     out.append(
         Scenario(
             id="S18_batch_queue",

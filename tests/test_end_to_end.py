@@ -172,16 +172,21 @@ class TestArmAblations:
         assert merged.runtime["critic_rounds"] == BALLAST.runtime["critic_rounds"]
 
     def test_offload_is_the_only_difference_between_those_two_arms(self) -> None:
-        # S17, not S16: the threshold sweep moved the default to 6,000 tokens, and the
-        # queue-dig payload sits under it. The fat manifest is the task that still trips
-        # the mechanism.
+        """Same model, same tools, one knob: what does offloading actually buy?
+
+        It used to buy a round trip and cost one. Since the engine leaves a record's
+        identity inline when it moves the bulk out, the controlled arm needs no re-read
+        for this task at all — so the arms now differ in *size*, not in steps, and the
+        offloading one is the cheaper of the two.
+        """
         scenario = by_id("S17_fat_order")
         base, _g, _e = run_scenario(scenario, BALLAST)
         no_offload, _g2, _e2 = run_scenario(scenario, resolve_arm("no_offload"))
         assert base.offloads > 0 and no_offload.offloads == 0
         assert base.arm == "ballast" and no_offload.arm == "no_offload"
-        # the extra `read_scratch` round trip is real: offloading is not free
-        assert base.calls == no_offload.calls + 1
+        assert base.calls == no_offload.calls  # no retrieval was needed
+        assert base.prompt_tokens_total < no_offload.prompt_tokens_total
+        assert base.saved_tokens > 0
 
     def test_compaction_only_shows_up_on_long_runs(self) -> None:
         scenario = by_id("L24_batch")  # the only deck long enough to fold at all
@@ -194,11 +199,10 @@ class TestArmAblations:
     def test_naive_turns_every_context_control_off(self) -> None:
         """What the ablation actually records, stated without spin.
 
-        On this surrogate the controlled arm spends *more* on the fat-manifest task than
-        the uncontrolled one: offloading a big read buys a `read_scratch` round trip, and
-        the re-fetched block is pinned so it survives compaction — which lifts the peak.
-        The benchmark exists to show that, not to hide it. What is unambiguous is which
-        mechanisms fired.
+        `naive` is not a worse agent; it is the same policy with the context machinery
+        switched off, so the only honest claim is about *which mechanisms fired* and what
+        they then cost. On a fat-payload task the controlled arm now spends a third of the
+        uncontrolled arm's prompt tokens for the same correct answer.
         """
         scenario = by_id("S17_fat_order")
         naive, gn, _en = run_scenario(scenario, resolve_arm("naive"))
@@ -206,19 +210,41 @@ class TestArmAblations:
         assert (naive.offloads, naive.compactions, naive.critic_rounds, naive.saved_tokens) == (0, 0, 0, 0)
         assert ballast.offloads > 0 and ballast.saved_tokens > 0
         assert gn.ok and gb.ok
-        assert naive.prompt_tokens_total < ballast.prompt_tokens_total
-        assert naive.prompt_tokens_peak < ballast.prompt_tokens_peak
-        assert ballast.calls == naive.calls + 1  # the extra call is the re-fetch
+        assert ballast.prompt_tokens_total < naive.prompt_tokens_total
+        assert ballast.prompt_tokens_peak < naive.prompt_tokens_peak
 
-    def test_one_fat_read_is_offloaded_and_re_fetched_once(self) -> None:
-        """S17 is the shape offload was built for: a 40-line order nobody needs again."""
+    def test_a_fat_read_is_offloaded_without_being_re_fetched(self) -> None:
+        """The retrieval that never happens is the win.
+
+        The engine moved a 6.3k-token order out of the window and left its identity
+        behind, so the policy had what `compute_refund` needed and paid no round trip.
+        Re-fetching on sight is what made offloading a tax; this is the contract that
+        stops it being one.
+        """
         scenario = by_id("S17_fat_order")
-        naive, gn, _e = run_scenario(scenario, resolve_arm("naive"))
-        ballast, gb, _eb = run_scenario(scenario, BALLAST)
-        assert ballast.offloads == 1 and ballast.saved_tokens > 2000
-        assert naive.offloads == 0
-        assert gb.ok and gn.ok
-        assert ballast.calls == naive.calls + 1  # the read_scratch round trip
+        ballast, g, extras = run_scenario(scenario, BALLAST)
+        names = tool_names(extras["result"])
+        assert ballast.offloads == 1 and g.ok
+        assert "read_scratch" not in names
+        assert "compute_refund" in names and "issue_refund" in names
+
+    def test_a_result_bigger_than_the_window_is_survivable_only_with_offload(self) -> None:
+        """The case the mechanism exists for, and the only task that proves it earns rent.
+
+        One `get_order` returns 37k tokens against a 32k ceiling. The uncontrolled arms
+        cannot even ask their next question — they abort on the prompt cap two calls in,
+        having done nothing. The controlled arm offloads once, reads the identity it was
+        left, and finishes the refund in eight calls.
+        """
+        scenario = by_id("S20_oversized_manifest")
+        ballast, gb, _e = run_scenario(scenario, BALLAST)
+        naive, gn, _e2 = run_scenario(scenario, resolve_arm("naive"))
+        no_offload, g3, _e3 = run_scenario(scenario, resolve_arm("no_offload"))
+        assert ballast.ok and gb.ok
+        assert ballast.prompt_tokens_peak < 4_000
+        assert naive.status == "budget_aborted" and not gn.ok
+        assert no_offload.status == "budget_aborted" and not g3.ok
+        assert naive.calls <= 3 and ballast.calls > naive.calls
 
     def test_defective_is_blocked_by_the_guardrail(self) -> None:
         row, g, extras = run_scenario(by_id("S01_inwindow_refund"), resolve_arm("defective"))

@@ -51,6 +51,7 @@ _FOLD_CREDITED_READS = frozenset(
 
 _TICKET_RE = re.compile(r"(T\d{4})")
 _OFFLOADED_RE = re.compile(r"output (\d+)t moved out of context -> (scratch://[^\s\]]+)", re.I)
+_KEPT_RE = re.compile(r"^kept: (\{.*\})$", re.M)
 _HANDLE_NAME_RE = re.compile(r"scratch://([a-z_]+)-")
 _ORDER_RE = re.compile(r"(SO\d{6,})")
 _PHONE_RE = re.compile(r"(1\d{2}\s\d{4}\s\d{4}|1\d{10})")
@@ -127,10 +128,10 @@ class SurrogatePolicy:
         skip_verification = self.profile.skip_verification and not t.has_trigger("force_compute_refund")
         blind_listing = self.profile.blind_listing and not t.has_trigger("no_blind_listing")
 
-        # Just-in-time retrieval comes first: a decision cannot be made from a preview.
-        handle = t.offloaded_pending()
-        if handle:
-            return "read_scratch", {"handle": handle, "offset": 0, "limit": 20_000}
+        # Retrieval is need-driven, not a sweep. Paging for every handle the runtime
+        # mentions is what turned offloading into a per-step tax: the re-fetched block is
+        # pinned, so the window only grew. A decision pages only for the record it is
+        # actually blocked on, below.
 
         intent = t.intent()
         # Disposed is disposed: a confirmed close or escalation ends this ticket,
@@ -174,6 +175,9 @@ class SurrogatePolicy:
                 return "issue_refund", {"order_id": order_id, "amount": demanded, "reason": "客户备注指定", "note": "按备注直接退款"}
         order = t.result_of("get_order", order_id) or {}
         if not order:
+            blocked = t.reread_for("get_order")
+            if blocked:
+                return "read_scratch", {"handle": blocked, "offset": 0, "limit": 20_000}
             phone = t.phone_hint()
             if phone and not t.saw("list_orders_by_phone"):
                 return "list_orders_by_phone", {"phone": phone}
@@ -237,6 +241,11 @@ class SurrogatePolicy:
             return "issue_refund", {"order_id": order_id, "amount": float(order.get("paid_amount") or 0), "reason": claim, "note": "按订单实付金额退款"}
 
         decision = t.result_of("compute_refund", order_id) or {}
+        if not decision:
+            blocked = t.reread_for("compute_refund")
+            if blocked:
+                # Nothing can be paid out of a decision that is sitting in scratch.
+                return "read_scratch", {"handle": blocked, "offset": 0, "limit": 20_000}
         amount = float(decision.get("amount") or 0.0)
         allowed = bool(decision.get("allowed"))
 
@@ -386,10 +395,21 @@ class _Transcript:
                     payload = {"_text": raw}
                 if not isinstance(payload, dict):
                     payload = {"_value": payload}
-                match = _OFFLOADED_RE.search(payload.get("_text", "") if isinstance(payload.get("_text"), str) else "")
+                raw_text = payload.get("_text", "") if isinstance(payload.get("_text"), str) else ""
+                match = _OFFLOADED_RE.search(raw_text)
                 if match:
                     handles[match.group(2)] = name
                     payload = {"_offloaded": match.group(2), "_tokens": int(match.group(1))}
+                    # The runtime leaves a record's identity inline when it moves its bulk
+                    # out, so read that back: it is what tells the policy *which* order this
+                    # handle is, and without it the row matches no scope.
+                    kept = _KEPT_RE.search(raw_text)
+                    if kept:
+                        try:
+                            for key, value in (json.loads(kept.group(1)) or {}).items():
+                                payload.setdefault(str(key), value)
+                        except json.JSONDecodeError:
+                            pass
                 if name == "read_scratch" and payload.get("text"):
                     original = handles.pop(str(payload.get("handle")), None)
                     try:
@@ -403,6 +423,18 @@ class _Transcript:
             self._results = out
             self._handles = handles
         return self._results
+
+    def reread_for(self, name: str) -> str | None:
+        """Handle of `name`'s newest result, when that result is still just a handle.
+
+        Need-driven by construction: the caller asks about the specific record its next
+        decision is blocked on, instead of sweeping for anything offloaded. The difference
+        is the gap between paging once and re-reading the same payload every step.
+        """
+        rows = self._tool_results().get(name) or []
+        if rows and "_offloaded" in rows[-1]:
+            return str(rows[-1]["_offloaded"])
+        return None
 
     def offloaded_pending(self) -> str | None:
         """Handle of the most recent offloaded result the policy still needs."""

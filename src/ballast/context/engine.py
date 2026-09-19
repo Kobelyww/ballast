@@ -138,9 +138,11 @@ class ContextEngine:
         if self.policy.enable_offload and name not in self.policy.offload_exempt and tokens > self.policy.offload_threshold:
             handle = self.scratch.put(f"{name}-{call_id}", content)
             preview = _preview(content, self.policy.preview_chars)
+            kept = _identity_fields(content)
             replacement = (
                 f"[output {tokens}t moved out of context -> {handle}]\n"
-                f"head: {preview[0]}\n"
+                + (f"kept: {json.dumps(kept, ensure_ascii=False, default=str)}\n" if kept else "")
+                + f"head: {preview[0]}\n"
                 f"tail: {preview[1]}\n"
                 f"call read_scratch(handle, offset, limit) only if the preview is insufficient."
             )
@@ -267,6 +269,41 @@ def _at_boundary(text: str, *, tail: bool = False) -> str:
 
 
 _KEY_FACT = ("order_id", "customer_id", "amount", "paid_amount", "refund_id", "coupon_id", "status", "risk_score", "tier", "handle")
+
+
+def _identity_fields(content: str, *, limit: int = 14, max_len: int = 80) -> dict[str, Any]:
+    """The scalar fields of a JSON record, left inline when its bulk moves to scratch.
+
+    A handle that hides *which* record it points at is worse than no handle at all: the
+    agent cannot tell whether it already holds what the next decision needs, so it
+    re-issues the read, the re-read is offloaded too, and the run pays for the same
+    payload every step. A record's identity is nearly always what a decision turns on;
+    its line items and event log rarely are.
+    """
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            out[str(key)] = value[:max_len]
+        elif isinstance(value, (int, float, bool)) or value is None:
+            out[str(key)] = value
+        elif isinstance(value, dict):
+            for inner, v in value.items():
+                if isinstance(v, str):
+                    out[f"{key}.{inner}"] = v[:max_len]
+                elif isinstance(v, (int, float, bool)) or v is None:
+                    out[f"{key}.{inner}"] = v
+                if len(out) >= limit:
+                    return out
+        if len(out) >= limit:
+            break
+    return out
+
 
 #: Header of the message that carries the compaction digest. Downstream readers —
 #: including the surrogate policy, which must judge a run on exactly the context the

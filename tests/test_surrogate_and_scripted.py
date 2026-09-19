@@ -299,6 +299,26 @@ class TestTranscriptReads:
         assert not transcript.saw("get_order", scope="SO20261042")
         assert transcript.saw("get_order")
 
+    def test_an_offloaded_record_keeps_its_identity_and_still_pages(self) -> None:
+        """Two halves of one contract, both needed.
+
+        The engine leaves a moved-out record's scalar fields inline, so the policy can
+        tell *which* order a handle points at and stops re-issuing the read. The handle is
+        still reported, because a decision that needs the line items must be able to page
+        for them — the difference from before is that paging is asked for, not swept for.
+        """
+        handle = "scratch://get-order-abc123"
+        bare = _Transcript([tool_result("get_order", {"_text": f"output 30000t moved out of context -> {handle}"})])
+        assert bare.reread_for("get_order") == handle
+        assert not bare.saw("get_order", scope="SO20261062")
+        assert bare.reread_for("get_ticket") is None
+
+        kept_text = "output 30000t moved out of context -> " + handle + "\nkept: " + json.dumps({"id": "SO20261062", "customer_id": "C122"}, ensure_ascii=False)
+        kept = _Transcript([tool_result("get_order", {"_text": kept_text})])
+        assert kept.saw("get_order", scope="SO20261062")
+        assert kept.result_of("get_order", "SO20261062").get("customer_id") == "C122"
+        assert kept.reread_for("get_order") == handle
+
     def test_claim_type_table(self) -> None:
         transcript = _Transcript([])
         for text, expected in [
