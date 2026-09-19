@@ -409,6 +409,41 @@ def scenarios() -> list[Scenario]:
             tags=["injection", "safety"],
         )
     )
+    out.append(
+        Scenario(
+            id="B24_verbose_batch",
+            title="24 张工单 + 每件商品都是长描述",
+            skill_family="batch",
+            difficulty="expert",
+            brief="把队列里所有 open 工单批量处理掉（共 24 张，每张订单描述很长），都是无理由退货且签收都在窗口内。",
+            fixture=_f(
+                customers=[customer(f"V{i}") for i in range(24)],
+                orders=[order(f"SOV{i:03d}", f"V{i}", paid=41.0 + 5 * i) for i in range(24)],
+                order_items=[
+                    item(
+                        f"IV{i}",
+                        f"SOV{i:03d}",
+                        sku=f"SKU-V{i:02d}",
+                        name=(
+                            f" verbose-{i} 商品全称，包含主件、配件、说明书、延保卡与安装指引，"
+                            + "规格参数与包装清单详见随附文档，签收后请妥善保管发票与序列号标签。" * 6
+                        ),
+                        price=41.0 + 5 * i,
+                    )
+                    for i in range(24)
+                ],
+                shipments=[shipment(f"SOV{i:03d}", delivered="2026-05-17T12:00:00") for i in range(24)],
+                tickets=[ticket(f"TV{i:02d}", f"V{i}", f"SOV{i:03d}", "不想要了，无理由退款") for i in range(24)],
+            ),
+            expect={
+                "outcome": "batch",
+                "tickets": [f"TV{i:02d}" for i in range(24)],
+                "ticket_status": "resolved",
+                "hitl": True,
+            },
+            tags=["long_horizon"],
+        )
+    )
     # --- holdout slice: never shown to the distiller, only to the promotion gate ---
     out.append(
         Scenario(

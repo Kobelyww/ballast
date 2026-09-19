@@ -325,6 +325,10 @@ class Agent:
                         payload = fence_payload(payload)
                         ctx.payloads_fenced += 1
                     engine.tool_result(tc.id, tc.name, payload)
+                    if result.ok:
+                        self._record_progress(ctx, tc.name, tc.arguments)
+                        if tc.name in ("list_tickets", "list_incidents"):
+                            self._record_queue(ctx, result.content)
                     blocked = bool(result.error) and (result.error or {}).get("error") != "repeated_call"
                     repeated_only = repeated_only and not (result.ok or blocked)
                     if not result.ok:
@@ -358,6 +362,24 @@ class Agent:
         self._checkpoint(ctx, engine, task, status=status, final_text=final_text)
         return self._result(ctx, engine, status, final_text, None, error, started)
 
+    def _record_queue(self, ctx: RunContext, content: str) -> None:
+        """Mirror the work list out of the transcript and into run state.
+
+        A queue that exists only as a tool result is a queue that compaction can
+        destroy; the run then re-queries forever, which looks like a stuck model and is
+        really a harness that forgot its own job.
+        """
+        try:
+            payload = json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            return
+        rows = payload.get("tickets") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return
+        ids = [str(r.get("id")) for r in rows if isinstance(r, dict) and r.get("id") and r.get("status") == "open"]
+        if ids:
+            ctx.progress["queue"] = ids
+
     def _record_progress(self, ctx: RunContext, name: str, args: dict[str, Any]) -> None:
         bucket = {"close_ticket": "closed", "escalate_ticket": "escalated", "issue_refund": "refunded", "send_coupon": "couponed"}.get(name)
         if bucket is None:
@@ -370,6 +392,8 @@ class Agent:
         progress = ctx.progress
         lines = [STATE_HEADER]
         lines.append(f"tickets_closed: {', '.join(progress['closed']) or 'none'}")
+        if progress.get("queue"):
+            lines.append(f"queue_seen_open: {', '.join(progress['queue'])}")
         lines.append(f"tickets_escalated: {', '.join(progress['escalated']) or 'none'}")
         lines.append(f"orders_refunded: {', '.join(progress['refunded']) or 'none'}")
         if ctx.computed:

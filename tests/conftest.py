@@ -200,3 +200,9 @@ def train_runs() -> list[tuple[Scenario, Any, Grade, dict[str, Any]]]:
         row, grade, extras = run_scenario(scenario, arm)
         out.append((scenario, row, grade, extras))
     return out
+
+
+#: Tasks the deliberately-hard tier contains: the controlled arm spends far fewer
+#: tokens on them and still does not finish, which is a result to publish, not a cell
+#: to delete. Two test modules need this list; it lives here so they cannot drift.
+HARD_TIER = {"S17_fat_order", "S18_batch_queue", "B24_verbose_batch"}

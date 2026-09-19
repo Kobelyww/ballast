@@ -25,7 +25,8 @@ from conftest import assert_tool_calls_answered
 
 # S17 and S18 are the long-horizon cases: they are tracked as known-failing tasks, so
 # only the invariants below are asserted there - never the grade.
-KNOWN_FAILING_LONG_HORIZON = {"S17_fat_order", "S18_batch_queue"}
+# Shared with test_end_to_end via conftest so the two lists cannot disagree.
+from conftest import HARD_TIER as KNOWN_FAILING_LONG_HORIZON
 
 
 def successful_calls(events: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:

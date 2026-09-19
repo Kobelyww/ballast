@@ -21,7 +21,7 @@ BALLAST = resolve_arm("ballast")
 
 # The long-horizon cases are tracked separately: they run, they hold their invariants
 # (see test_invariants.py), but their grade is not asserted here.
-LONG_HORIZON = {"S17_fat_order", "S18_batch_queue"}
+from conftest import HARD_TIER as LONG_HORIZON  # documented hard tier, shared with test_invariants
 
 
 def tool_names(result: Any) -> list[str]:

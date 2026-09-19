@@ -180,10 +180,12 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **Both arms now finish every task.** With 53 tasks at 100% for `naive` and `ballast`
-  alike, the suite has no capability headroom left — every difference you see is cost,
-  reliability or a deliberately defective arm. Harder tasks are the main thing this
-  project needs from other people. If your runs are short, run `naive` — the
+- **The hard tier is one task deep.** `B24_verbose_batch` fails at 12/24 on the
+  controlled arm and is the *only* place in the suite where spending less costs
+  capability. One such task is a curiosity, not a regime: the right next contribution is
+  a ladder of them (12 / 24 / 48 verbose-ticket batches, mixed-shape queues) so the
+  crossover's failure side has error bars too. The tests reference it through a single
+  `conftest.HARD_TIER` list, so it cannot be quietly forgotten. If your runs are short, run `naive` — the
   benchmark says so explicitly, which is the point of having one.
 - **Long-horizon coverage is thin.** `S17_fat_order` (40-line order) and
   `S18_batch_queue` (5 tickets in one context) exercise offload-then-refetch and
