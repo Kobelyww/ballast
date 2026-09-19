@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.0] - 2026-09-19
+
+A worked trace pair, and the retraction of a headline reliability number that turned out to be
+an assumption.
+
 - **A reliability claim retracted.** The report's `pass^k` table was headed "on repeat
   draws" but computed `p̂^k`, tau-bench's independent-draws estimate. The offline surrogate
   is deterministic, so every draw of a task is identical and the measured value equals
