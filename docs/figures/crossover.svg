@@ -5,8 +5,8 @@
 <text x="78" y="39" font-size="10.5" fill="#666">one point per task · y = naive prompt tokens ÷ ballast prompt tokens</text>
 <text x="78" y="53" font-size="10.5" fill="#666">above 1.00 the controlled arm is the cheaper one; below it, the controlled arm is the one paying</text>
 <rect x="78" y="58" width="0" height="0"/>
-<rect x="78" y="62" width="788" height="229.8" fill="#eef6ff"/>
-<rect x="78" y="291.8" width="788" height="100.2" fill="#fdf1e6"/>
+<rect x="78" y="62" width="788" height="296.1" fill="#eef6ff"/>
+<rect x="78" y="358.1" width="788" height="33.9" fill="#fdf1e6"/>
 <text x="86" y="77" font-size="10.5" fill="#1a5aa0">control SAVES — folded history stops being billed on every call</text>
 <text x="86" y="385" font-size="10.5" fill="#a05a10">control PAYS — briefing and skill machinery is pure overhead</text>
 <line x1="75.6" y1="62" x2="75.6" y2="392" stroke="#eaeaea"/>
@@ -29,52 +29,51 @@
 <text x="749.8" y="408" font-size="10" fill="#777" text-anchor="middle">2.0M</text>
 <line x1="852.9" y1="62" x2="852.9" y2="392" stroke="#eaeaea"/>
 <text x="852.9" y="408" font-size="10" fill="#777" text-anchor="middle">5.0M</text>
-<line x1="78" y1="291.8" x2="866" y2="291.8" stroke="#c0392b" stroke-width="1.6" stroke-dasharray="6 4"/>
-<text x="70" y="295.3" font-size="10" fill="#c0392b" text-anchor="end">1.00</text>
-<line x1="78" y1="76.8" x2="866" y2="76.8" stroke="#e0e0e0" stroke-width="1"/>
-<text x="70" y="80.3" font-size="10" fill="#777" text-anchor="end">1.60</text>
-<circle cx="131.8" cy="337.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="134.5" cy="345.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="136.6" cy="330.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="136.9" cy="338.6" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="137.4" cy="342.5" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="137.4" cy="339.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="145.4" cy="334.8" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="155.6" cy="327.5" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="158.2" cy="340.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="159.2" cy="329.0" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="159.3" cy="336.0" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="160.0" cy="335.7" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="162.2" cy="334.8" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="166.0" cy="332.9" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="173.8" cy="339.7" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="190.3" cy="337.8" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="190.3" cy="331.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="276.5" cy="374.1" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="334.4" cy="338.9" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="381.0" cy="316.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="416.8" cy="311.6" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="453.1" cy="310.6" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="530.0" cy="263.2" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<line x1="530.0" y1="263.2" x2="530.0" y2="392" stroke="#c0392b" stroke-width="1" stroke-dasharray="2 3"/>
+<line x1="78" y1="386.6" x2="866" y2="386.6" stroke="#e0e0e0" stroke-width="1"/>
+<text x="70" y="390.1" font-size="10" fill="#777" text-anchor="end">0.80</text>
+<line x1="78" y1="358.1" x2="866" y2="358.1" stroke="#c0392b" stroke-width="1.6" stroke-dasharray="6 4"/>
+<text x="70" y="361.6" font-size="10" fill="#c0392b" text-anchor="end">1.00</text>
+<circle cx="131.8" cy="376.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="134.5" cy="379.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="136.6" cy="373.4" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="136.9" cy="376.7" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="137.4" cy="378.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="137.4" cy="377.0" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="145.4" cy="375.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="155.6" cy="372.3" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="158.2" cy="377.4" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="159.2" cy="372.9" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="159.3" cy="375.7" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="160.0" cy="375.6" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="162.2" cy="375.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="166.0" cy="374.5" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="173.8" cy="377.2" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="190.3" cy="376.4" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="190.3" cy="373.8" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="328.1" cy="384.9" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="334.4" cy="363.7" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="381.0" cy="367.8" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="416.8" cy="366.0" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="453.1" cy="365.6" r="3.4" fill="#a05a10" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="530.0" cy="346.8" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<line x1="530.0" y1="346.8" x2="530.0" y2="392" stroke="#c0392b" stroke-width="1" stroke-dasharray="2 3"/>
 <text x="523.0" y="366" font-size="10" fill="#c0392b" text-anchor="end">break-even: B09 at 284k tokens</text>
-<circle cx="583.5" cy="194.5" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="587.1" cy="193.9" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
-<circle cx="587.6" cy="191.9" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="646.3" cy="87.1" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
-<circle cx="661.5" cy="186.3" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
-<circle cx="730.7" cy="188.4" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
-<circle cx="817.6" cy="168.2" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
-<circle cx="832.2" cy="214.2" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
-<text x="276.5" y="363.1" font-size="10" fill="#333" text-anchor="middle">S17 · 0.73×</text>
-<text x="530.0" y="252.2" font-size="10" fill="#333" text-anchor="middle">B09 · 1.13×</text>
-<text x="587.1" y="182.9" font-size="10" fill="#333" text-anchor="middle">L12 · 1.36×</text>
-<text x="646.3" y="76.1" font-size="10" fill="#333" text-anchor="middle">B16 · 1.69×</text>
-<text x="661.5" y="175.3" font-size="10" fill="#333" text-anchor="middle">L16 · 1.42×</text>
-<text x="730.7" y="205.4" font-size="10" fill="#333" text-anchor="middle">L24 · 1.55×</text>
-<text x="817.6" y="157.2" font-size="10" fill="#333" text-anchor="middle">L36 · 1.68×</text>
-<text x="830.8" y="203.2" font-size="10" fill="#333" text-anchor="middle">L48 · 1.51×</text>
+<circle cx="583.5" cy="319.4" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="587.1" cy="319.2" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
+<circle cx="587.6" cy="318.4" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="646.3" cy="276.7" r="3.4" fill="#1a5aa0" fill-opacity="0.6" stroke="#ffffff" stroke-width="0.8"/>
+<circle cx="661.5" cy="259.8" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
+<circle cx="730.7" cy="205.1" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
+<circle cx="817.6" cy="72.0" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
+<circle cx="832.2" cy="135.0" r="5.2" fill="#1a5aa0" fill-opacity="0.95" stroke="#ffffff" stroke-width="1.2"/>
+<text x="328.1" y="373.9" font-size="10" fill="#333" text-anchor="middle">S17 · 0.74×</text>
+<text x="530.0" y="335.8" font-size="10" fill="#333" text-anchor="middle">B09 · 1.13×</text>
+<text x="587.1" y="308.2" font-size="10" fill="#333" text-anchor="middle">L12 · 1.36×</text>
+<text x="661.5" y="248.8" font-size="10" fill="#333" text-anchor="middle">L16 · 1.80×</text>
+<text x="730.7" y="194.1" font-size="10" fill="#333" text-anchor="middle">L24 · 2.25×</text>
+<text x="817.6" y="61.0" font-size="10" fill="#333" text-anchor="middle">L36 · 3.28×</text>
+<text x="830.8" y="124.0" font-size="10" fill="#333" text-anchor="middle">L48 · 2.76×</text>
 <text x="472" y="444" font-size="11" fill="#555" text-anchor="middle">total prompt tokens per task on the uncontrolled arm (log scale)</text>
 <text x="16" y="227" font-size="11" fill="#555" text-anchor="middle" transform="rotate(-90 16 227)">naive ÷ ballast prompt tokens</text>
-<text x="78" y="462" font-size="9" fill="#999">drawn from bench/results/eval.json · 2026-09-19T09:28:48 · regenerate with scripts/plot_crossover.py</text>
+<text x="78" y="462" font-size="9" fill="#999">drawn from bench/results/eval.json · 2026-09-19T10:18:56 · regenerate with scripts/plot_crossover.py</text>
 </svg>

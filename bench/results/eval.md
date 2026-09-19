@@ -1,55 +1,55 @@
-_generated 2026-09-19T09:28:48 · provider `surrogate` · 1116 runs over 12 arms_
+_generated 2026-09-19T10:18:56 · provider `surrogate` · 1116 runs over 12 arms_
 
 ## Headline
 
 | arm | success | 95% CI | mean cost | mean prompt tok | peak ctx | calls | offloads | compactions | guardrails |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| `naive` | 96.8% (90/93) | [90.9%, 98.9%] | 0.9431 | 434587 | 32023 | 42.7 | 0 | 0 | 3 |
-| `ballast` | 96.8% (90/93) | [90.9%, 98.9%] | 0.6306 | 343788 | 19987 | 45.6 | 18 | 894 | 3 |
-| `bloated` | 96.8% (90/93) | [90.9%, 98.9%] | 0.6471 | 353958 | 19987 | 46.7 | 30 | 918 | 3 |
-| `defective` | 12.9% (12/93) | [7.5%, 21.2%] | 0.0382 | 20164 | 7862 | 8.7 | 18 | 3 | 165 |
-| `hierarchical` | 96.8% (90/93) | [90.9%, 98.9%] | 0.6349 | 346168 | 20059 | 45.6 | 18 | 894 | 3 |
-| `no_budget` | 100.0% (93/93) | [96.0%, 100.0%] | 0.6968 | 382985 | 22796 | 47.4 | 18 | 975 | 3 |
-| `no_compaction` | 93.5% (87/93) | [86.6%, 97.0%] | 0.8007 | 373966 | 26588 | 39.8 | 18 | 6 | 3 |
-| `no_context_control` | 93.5% (87/93) | [86.6%, 97.0%] | 0.7827 | 368819 | 26502 | 40.2 | 0 | 6 | 3 |
-| `no_offload` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4335 | 215567 | 7654 | 45.6 | 0 | 78 | 3 |
-| `noisy` | 45.2% (42/93) | [35.4%, 55.3%] | 0.0312 | 15421 | 8169 | 8.3 | 6 | 9 | 3 |
-| `static_briefing` | 96.8% (90/93) | [90.9%, 98.9%] | 0.6270 | 335978 | 19783 | 45.6 | 18 | 867 | 3 |
-| `tight_budget` | 74.2% (69/93) | [64.5%, 82.0%] | 0.1717 | 90790 | 8109 | 24.5 | 18 | 465 | 3 |
+| `naive` | 96.8% (90/93) | [90.9%, 98.9%] | 0.9439 | 435146 | 32023 | 42.7 | 0 | 0 | 3 |
+| `ballast` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4350 | 216430 | 9460 | 45.6 | 3 | 78 | 3 |
+| `bloated` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4593 | 237438 | 9575 | 47.0 | 3 | 201 | 3 |
+| `defective` | 12.9% (12/93) | [7.5%, 21.2%] | 0.0354 | 19260 | 9467 | 8.5 | 3 | 0 | 165 |
+| `hierarchical` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4381 | 218414 | 9532 | 45.6 | 3 | 81 | 3 |
+| `no_budget` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4350 | 216430 | 9460 | 45.6 | 3 | 78 | 3 |
+| `no_compaction` | 93.5% (87/93) | [86.6%, 97.0%] | 0.7843 | 369681 | 26502 | 40.2 | 3 | 6 | 3 |
+| `no_context_control` | 93.5% (87/93) | [86.6%, 97.0%] | 0.7835 | 369378 | 26502 | 40.2 | 0 | 6 | 3 |
+| `no_offload` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4343 | 216127 | 8154 | 45.6 | 0 | 78 | 3 |
+| `noisy` | 48.4% (45/93) | [38.5%, 58.4%] | 0.0316 | 15987 | 9912 | 8.2 | 3 | 6 | 3 |
+| `static_briefing` | 100.0% (93/93) | [96.0%, 100.0%] | 0.4351 | 210861 | 9271 | 45.6 | 3 | 75 | 3 |
+| `tight_budget` | 71.0% (66/93) | [61.1%, 79.2%] | 0.1647 | 87683 | 9144 | 26.2 | 3 | 408 | 3 |
 
 ## Reliability (pass^k on repeat draws)
 
 | arm | pass^1 | pass^2 | pass^3 |
 |---|---:|---:|---:|
 | `naive` | 96.8% | 93.7% | 90.6% |
-| `ballast` | 96.8% | 93.7% | 90.6% |
-| `bloated` | 96.8% | 93.7% | 90.6% |
+| `ballast` | 100.0% | 100.0% | 100.0% |
+| `bloated` | 100.0% | 100.0% | 100.0% |
 | `defective` | 12.9% | 1.7% | 0.2% |
-| `hierarchical` | 96.8% | 93.7% | 90.6% |
+| `hierarchical` | 100.0% | 100.0% | 100.0% |
 | `no_budget` | 100.0% | 100.0% | 100.0% |
 | `no_compaction` | 93.5% | 87.5% | 81.9% |
 | `no_context_control` | 93.5% | 87.5% | 81.9% |
 | `no_offload` | 100.0% | 100.0% | 100.0% |
-| `noisy` | 45.2% | 20.4% | 9.2% |
-| `static_briefing` | 96.8% | 93.7% | 90.6% |
-| `tight_budget` | 74.2% | 55.0% | 40.8% |
+| `noisy` | 48.4% | 23.4% | 11.3% |
+| `static_briefing` | 100.0% | 100.0% | 100.0% |
+| `tight_budget` | 71.0% | 50.4% | 35.7% |
 
 ## Cost / quality frontier
 
 | arm | mean cost | success | dominates |
 |---|---:|---:|---|
-| `naive` | 0.9431 | 96.8% | — |
-| `ballast` | 0.6306 | 96.8% | `naive`, `no_compaction`, `no_context_control`, `hierarchical`, `bloated` |
-| `bloated` | 0.6471 | 96.8% | `naive`, `no_compaction`, `no_context_control` |
-| `defective` | 0.0382 | 12.9% | — |
-| `hierarchical` | 0.6349 | 96.8% | `naive`, `no_compaction`, `no_context_control`, `bloated` |
-| `no_budget` | 0.6968 | 100.0% | `naive`, `no_compaction`, `no_context_control` |
-| `no_compaction` | 0.8007 | 93.5% | — |
-| `no_context_control` | 0.7827 | 93.5% | `no_compaction` |
-| `no_offload` | 0.4335 | 100.0% | `naive`, `ballast`, `no_compaction`, `no_context_control`, `static_briefing`, `no_budget`, `hierarchical`, `bloated` |
-| `noisy` | 0.0312 | 45.2% | `defective` |
-| `static_briefing` | 0.6270 | 96.8% | `naive`, `ballast`, `no_compaction`, `no_context_control`, `hierarchical`, `bloated` |
-| `tight_budget` | 0.1717 | 74.2% | — |
+| `naive` | 0.9439 | 96.8% | — |
+| `ballast` | 0.4350 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `static_briefing`, `hierarchical`, `bloated` |
+| `bloated` | 0.4593 | 100.0% | `naive`, `no_compaction`, `no_context_control` |
+| `defective` | 0.0354 | 12.9% | — |
+| `hierarchical` | 0.4381 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `bloated` |
+| `no_budget` | 0.4350 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `static_briefing`, `hierarchical`, `bloated` |
+| `no_compaction` | 0.7843 | 93.5% | — |
+| `no_context_control` | 0.7835 | 93.5% | `no_compaction` |
+| `no_offload` | 0.4343 | 100.0% | `naive`, `ballast`, `no_compaction`, `no_context_control`, `static_briefing`, `no_budget`, `hierarchical`, `bloated` |
+| `noisy` | 0.0316 | 48.4% | `defective` |
+| `static_briefing` | 0.4351 | 100.0% | `naive`, `no_compaction`, `no_context_control`, `hierarchical`, `bloated` |
+| `tight_budget` | 0.1647 | 71.0% | — |
 
 ## Paired comparisons vs reference arm
 
@@ -57,17 +57,17 @@ Paired on identical scenarios against `ballast` (McNemar exact on discordant pai
 
 | comparison | Δ success | discordant b/c | p (exact) | effect h | cost ratio [95% CI] |
 |---|---:|---|---:|---:|---|
-| `naive` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.50 [1.31, 1.58] |
-| `bloated` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.03 [1.01, 1.09] |
-| `defective` vs `ballast` | -0.839 | 0/26 | 0.0000 | -2.05 | 0.06 [0.04, 0.15] |
+| `naive` vs `ballast` | -0.032 | 0/1 | 1.0000 | -0.36 | 2.17 [1.39, 2.61] |
+| `bloated` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.06 [1.04, 1.07] |
+| `defective` vs `ballast` | -0.871 | 0/27 | 0.0000 | -2.41 | 0.08 [0.05, 0.17] |
 | `hierarchical` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.01 [1.00, 1.01] |
-| `no_budget` vs `ballast` | +0.032 | 1/0 | 1.0000 | +0.36 | 1.10 [1.00, 1.24] |
-| `no_compaction` vs `ballast` | -0.032 | 0/1 | 1.0000 | -0.15 | 1.27 [1.11, 1.51] |
-| `no_context_control` vs `ballast` | -0.032 | 0/1 | 1.0000 | -0.15 | 1.24 [1.10, 1.44] |
-| `no_offload` vs `ballast` | +0.032 | 1/0 | 1.0000 | +0.36 | 0.69 [0.60, 0.95] |
-| `noisy` vs `ballast` | -0.516 | 0/16 | 0.0000 | -1.31 | 0.05 [0.02, 0.17] |
-| `static_briefing` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 0.99 [0.99, 1.00] |
-| `tight_budget` vs `ballast` | -0.226 | 0/7 | 0.0156 | -0.70 | 0.27 [0.17, 0.60] |
+| `no_budget` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.00 [1.00, 1.00] |
+| `no_compaction` vs `ballast` | -0.065 | 0/2 | 0.5000 | -0.51 | 1.80 [1.41, 2.06] |
+| `no_context_control` vs `ballast` | -0.065 | 0/2 | 0.5000 | -0.51 | 1.80 [1.41, 2.06] |
+| `no_offload` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.00 [0.99, 1.00] |
+| `noisy` vs `ballast` | -0.516 | 0/16 | 0.0000 | -1.60 | 0.07 [0.03, 0.20] |
+| `static_briefing` vs `ballast` | +0.000 | 0/0 | 1.0000 | +0.00 | 1.00 [0.99, 1.01] |
+| `tight_budget` vs `ballast` | -0.290 | 0/9 | 0.0039 | -1.14 | 0.38 [0.27, 0.61] |
 
 ## Where the savings actually come from
 
@@ -75,12 +75,12 @@ Aggregated over every scenario, the reference arm's cost ratio can hide its own 
 
 | scenario class | n | mean cost ballast | mean cost naive | naive/ballast cost | naive/ballast prompt tokens |
 |---|---:|---:|---:|---|---|
-| all scenarios | 31 | 0.6306 | 0.9431 | 1.50 [1.31, 1.58] | 1.26 [1.19, 1.32] |
-| class: long_horizon | 12 | 1.5828 | 2.3947 | 1.51 [1.35, 1.60] | 1.28 [1.21, 1.34] |
-| class: bloat | 4 | 0.2344 | 0.2897 | 1.24 (n too small) | 1.17 (n too small) |
+| all scenarios | 31 | 0.4350 | 0.9439 | 2.17 [1.39, 2.61] | 2.01 [1.31, 2.41] |
+| class: long_horizon | 12 | 1.0764 | 2.3947 | 2.22 [1.46, 2.67] | 2.07 [1.38, 2.46] |
+| class: bloat | 4 | 0.2375 | 0.2957 | 1.24 (n too small) | 1.17 (n too small) |
 | class: restraint | 5 | 0.0196 | 0.0186 | 0.95 [0.94, 0.95] | 0.87 [0.86, 0.87] |
 | class: flaky | 1 | 0.0316 | 0.0301 | 0.95 (n too small) | 0.87 (n too small) |
-| class: retrieval | 1 | 0.1003 | 0.0801 | 0.80 (n too small) | 0.87 (n too small) |
+| class: retrieval | 1 | 0.0816 | 0.0801 | 0.98 (n too small) | 0.96 (n too small) |
 | ordinary (no special tag) | 10 | 0.0237 | 0.0226 | 0.95 [0.95, 0.96] | 0.88 [0.88, 0.89] |
 
 _A ratio above 1.00 with a lower bound above 1.00 means the uncontrolled arm is **reliably more expensive** on that class; a CI spanning 1.00 means the suite cannot tell. Read the classes, not just the aggregate._
@@ -99,10 +99,10 @@ Sorted by task length, the ratio of `naive` to `ballast` prompt tokens is not a 
 | `L12_batch` | 470,904 | 1.27 | 1.36 |
 | `B12_batch_queue` | 473,084 | 1.28 | 1.36 |
 | `B16_batch_queue` | 797,108 | 1.57 | 1.69 |
-| `L16_fat_batch` | 912,711 | 1.29 | 1.42 |
-| `L24_batch` | 1,687,440 | 1.29 | 1.55 |
-| `L36_batch` | 3,653,916 | 1.34 | 1.68 |
-| `L48_batch` | 4,160,735 | 1.22 | 1.51 |
+| `L16_fat_batch` | 912,711 | 1.69 | 1.80 |
+| `L24_batch` | 1,687,440 | 2.07 | 2.25 |
+| `L36_batch` | 3,653,916 | 3.01 | 3.28 |
+| `L48_batch` | 4,160,735 | 2.57 | 2.76 |
 
 _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The overhead is the retrieved policy briefing and skill machinery; the payoff is that a folded transcript is billed on every later call instead of forever._
 
@@ -111,16 +111,16 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | arm | agent faults | runtime faults | environment faults | top codes |
 |---|---:|---:|---:|---|
 | `naive` | 0 | 3 | 6 | upstream_timeout×6, budget_exhausted×3 |
-| `ballast` | 0 | 3 | 6 | upstream_timeout×6, budget_exhausted×3 |
-| `bloated` | 3 | 3 | 6 | upstream_timeout×6, budget_exhausted×3, loop_detected×3 |
+| `ballast` | 9 | 0 | 6 | loop_detected×9, upstream_timeout×6 |
+| `bloated` | 15 | 0 | 6 | loop_detected×15, upstream_timeout×6 |
 | `defective` | 0 | 0 | 3 | upstream_timeout×3 |
-| `hierarchical` | 0 | 3 | 6 | upstream_timeout×6, budget_exhausted×3 |
-| `no_budget` | 0 | 0 | 6 | upstream_timeout×6 |
+| `hierarchical` | 9 | 0 | 6 | loop_detected×9, upstream_timeout×6 |
+| `no_budget` | 9 | 0 | 6 | loop_detected×9, upstream_timeout×6 |
 | `no_compaction` | 0 | 6 | 6 | upstream_timeout×6, budget_exhausted×6 |
 | `no_context_control` | 0 | 6 | 6 | upstream_timeout×6, budget_exhausted×6 |
 | `no_offload` | 9 | 0 | 6 | loop_detected×9, upstream_timeout×6 |
-| `noisy` | 240 | 0 | 3 | unknown_argument×126, missing_required_argument×114, upstream_timeout×3 |
-| `static_briefing` | 0 | 3 | 6 | upstream_timeout×6, budget_exhausted×3 |
+| `noisy` | 246 | 0 | 3 | unknown_argument×129, missing_required_argument×117, upstream_timeout×3 |
+| `static_briefing` | 9 | 0 | 6 | loop_detected×9, upstream_timeout×6 |
 | `tight_budget` | 0 | 24 | 6 | budget_exhausted×24, upstream_timeout×6 |
 
 ## Per-scenario outcome
@@ -139,7 +139,7 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | L16_fat_batch | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | L24_batch | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | L36_batch | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| L48_batch | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| L48_batch | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
 | S01_inwindow_refund | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | S02_window_closed | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | S03_quality_with_shipping | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -154,7 +154,7 @@ _Below 1.00 the controlled arm is the more expensive one; above it, cheaper. The
 | S13_coupon_over_cap | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | S14_flaky_upstream | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | S15_context_bloat | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| S16_queue_dig | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
-| S17_fat_order | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| S16_queue_dig | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| S17_fat_order | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 | S18_batch_queue | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | S19_batch_twelve | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |

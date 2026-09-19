@@ -5,7 +5,7 @@ Zero runtime dependencies on purpose — see docs/ARCHITECTURE.md for why.
 
 from __future__ import annotations
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .context.engine import ContextEngine, ContextPolicy
 from .kernel.agent import Agent, AgentConfig, RunResult

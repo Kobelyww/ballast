@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.5.0] - 2026-09-19
+
+The suite's last known failure turned out to be a default we had never measured.
+
+### Changed
+
+- **`ContextPolicy.offload_threshold`: 1,200 → 6,000 tokens**, with the sweep recorded in
+  the comment. At 1,200 offloading fired on results a 9,000-token window could have
+  carried; because a re-fetched block is *pinned* (so the retrieval is not evicted again),
+  each offload left the run carrying that payload for the rest of its life. Over the 15
+  payload-heavy train tasks: **+61% prompt tokens, +47% cost, and one task lost to a
+  budget abort** for zero benefit.
+- `S17_fat_order` re-sized to 82 lines (≈6.3k tokens) so the mechanism still has a task
+  that trips it and the with/without ablations stay meaningful.
+
+### Added
+
+- **`scripts/offload_sweep.py`** reproduces the threshold table from the tagged task set,
+  offline, in seconds.
+
+### Removed
+
+- **`conftest.HARD_TIER` is empty.** Every task that was ever listed there —
+  `S17_fat_order`, `S18_batch_queue`, `L48_batch` — was a harness defect, not a capability
+  limit, and each was localised by an ablation arm rather than by reading code. The
+  plumbing is kept deliberately: a future entry has to earn its place against a sweep.
+
+### Measured
+
+`L48_batch` goes from 39/48 `budget_aborted` to **48/48 in ¥3.29**, so the controlled arm
+now finishes the entire train slice. The story this changes is not "we are cheaper" — it is
+that a context control which is *pinned on re-read* interacts with the budget in a way
+neither mechanism documents on its own, and that the interaction was invisible until the
+deck was long enough to hit the wall.
+
 ## [0.4.0] - 2026-09-19
 
 A hard-tier ladder of long-horizon batch tasks — and the four defects it caught, one in
