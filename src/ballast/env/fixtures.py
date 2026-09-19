@@ -492,14 +492,14 @@ def scenarios() -> list[Scenario]:
     out.append(
         Scenario(
             id="S17_fat_order",
-            title="40 件订单中的缺件退款",
+            title="82 件订单中的缺件退款",
             skill_family="missing_item",
             difficulty="hard",
-            brief="工单 T1061：整箱到货少发一件，客户报缺件，只退了缺的那件 SKU-BULK-37。",
+            brief="工单 T1061：整箱到货少发一件，客户报缺件，只退了缺的那件 SKU-BULK-61。",
             fixture=_f(
                 customers=[customer("C121", tier="GOLD")],
-                orders=[order("SO20261061", "C121", paid=round(40 * 45.0, 2))],
-                order_items=[item(f"IB{i}", "SO20261061", sku=f"SKU-BULK-{i}", name=f"批量采购商品{i}，含配件、说明书与保修卡，默认规格", price=45.0, qty=1, delivered=1 if i != 37 else 0) for i in range(1, 41)],
+                orders=[order("SO20261061", "C121", paid=round(82 * 45.0, 2))],
+                order_items=[item(f"IB{i}", "SO20261061", sku=f"SKU-BULK-{i}", name=f"批量采购商品{i}，含配件、说明书与保修卡，默认规格", price=45.0, qty=1, delivered=1 if i != 61 else 0) for i in range(1, 83)],
                 shipments=[
                     shipment(
                         "SO20261061",
@@ -508,7 +508,7 @@ def scenarios() -> list[Scenario]:
                         events=[{"at": f"2026-05-{12 + (j % 4):02d}T{j:02d}:00:00", "where": f"转运节点{j}，详细描述信息若干"} for j in range(1, 21)],
                     )
                 ],
-                tickets=[ticket("T1061", "C121", "SO20261061", "少发了一件，缺件退款 SKU-BULK-37")],
+                tickets=[ticket("T1061", "C121", "SO20261061", "少发了一件，缺件退款 SKU-BULK-61")],
             ),
             expect={"outcome": "refund", "amount": 45.0, "ticket_status": "resolved", "hitl": True, "claim_type": "missing_item"},
             tags=["bloat"],

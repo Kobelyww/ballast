@@ -72,7 +72,7 @@ TIGHT = {"max_cost": 0.5, "max_steps": 60, "max_wall_s": 300.0, "max_prompt_toke
 BASE = Arm(
     name="ballast",
     note="default runtime: offload + compaction + retrieved briefing + one critic round",
-    context={"token_budget": 9_000, "compact_threshold": 0.85, "offload_threshold": 1_200, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]},
+    context={"token_budget": 9_000, "compact_threshold": 0.85, "offload_threshold": 6_000, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]},
     budget={"max_cost": 6.0, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 32_000},
     runtime={"strategy": "react", "critic_rounds": 1, "enable_sop_briefing": True, "enable_skills": False, "soft_degrade": True, "max_iterations": 120},
 )
@@ -95,7 +95,7 @@ DEFAULT_ARMS: dict[str, Arm] = {
         budget=BASE.budget,
     ),
     "static_briefing": Arm("static_briefing", "whole SOP pasted into the system prompt instead of retrieved", runtime={"briefing_mode": "static"}, budget=BASE.budget),
-    "tight_budget": Arm("tight_budget", "budget too small to finish naively; forces soft degradation", budget=dict(TIGHT), runtime={"max_iterations": 60}, context={"token_budget": 5_000, "offload_threshold": 1_200, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]}),
+    "tight_budget": Arm("tight_budget", "budget too small to finish naively; forces soft degradation", budget=dict(TIGHT), runtime={"max_iterations": 60}, context={"token_budget": 5_000, "offload_threshold": 6_000, "keep_recent_blocks": 8, "offload_exempt": ["read_scratch"]}),
     "no_budget": Arm("no_budget", "no ceiling: what the same policy costs when nothing stops it", budget={"max_cost": 1e6, "max_steps": 400, "max_wall_s": 900.0, "max_prompt_tokens": 1_000_000}),
     "hierarchical": Arm("hierarchical", "planner -> worker -> critic", runtime={"strategy": "plan_execute", "critic_rounds": 2}, budget=BASE.budget),
     "defective": Arm("defective", "policy that skips the mandatory computation step (guardrail target)", profile={"skip_verification": True}, budget=BASE.budget),

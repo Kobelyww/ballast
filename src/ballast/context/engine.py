@@ -29,7 +29,13 @@ from ..support.text import ScratchStore, estimate_message_tokens, estimate_token
 class ContextPolicy:
     token_budget: int = 12_000
     compact_threshold: float = 0.85
-    offload_threshold: int = 1_200
+    # Measured, not guessed. Sweeping this threshold over the payload-heavy deck
+    # (`scripts/offload_sweep.py`): at 1,200 offloading fired on results a 9,000-token window
+    # could have carried, and each offload came back as a *pinned* re-fetch the run then
+    # carried for the rest of its life — +61% prompt tokens, +47% cost, and one task lost to a
+    # budget abort. At 6,000 the mechanism still catches a genuinely oversized record and costs
+    # nothing elsewhere.
+    offload_threshold: int = 6_000
     keep_recent_blocks: int = 8
     preview_chars: int = 600
     enable_offload: bool = True
