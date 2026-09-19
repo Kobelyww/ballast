@@ -10,7 +10,7 @@ Zero runtime dependencies · every test runs without an API key · auditable, re
 ![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-yellow)
 ![tests](https://img.shields.io/badge/benchmark-59%20tasks%20×%2012%20arms-blue)
-![offline](https://img.shields.io/badge/tests-655%20offline%2C%20no%20API%20key-blueviolet)
+![offline](https://img.shields.io/badge/tests-660%20offline%2C%20no%20API%20key-blueviolet)
 
 </div>
 
@@ -332,7 +332,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 655 tests (13 skipped by design), ~2 min, no API key, no external network
+make test     # 660 tests (13 skipped by design), ~2 min, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
