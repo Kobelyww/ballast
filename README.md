@@ -384,7 +384,7 @@ src/ballast/
                incidents — with their policy engines, corpora, faults and task decks
   tools/       the domain toolkits the toolkit layer wraps: desk and ops
   bench/       arms, runner, graders, fault taxonomy, pass^k / McNemar / bootstrap
-  cli.py       run / resume / eval / report / skills / gate / arms / doctor
+  cli.py       run · eval · report · arms · trace · approvals · skills
 ```
 
 Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) (design rationale) ·
