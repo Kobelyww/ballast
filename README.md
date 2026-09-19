@@ -410,6 +410,11 @@ guidance](https://www.anthropic.com/engineering/effective-context-engineering-fo
 Ballast reimplements the subset it needs from scratch, in stdlib, so that the
 mechanisms stay measurable.
 
+What each of those projects does, what this runtime does differently, and what the
+difference measurably cost or bought — including one row for a mechanism the guidance
+recommends and this runtime does **not** implement — is in
+[`docs/PRIOR_ART.md`](docs/PRIOR_ART.md).
+
 MIT License · © 2026 Haobo Wang
 
 ---
