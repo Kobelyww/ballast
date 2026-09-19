@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+- **Worked trace pair for `S20_oversized_manifest`** in `docs/examples/traces.md`: the same
+  task on `ballast` (8 calls, 2.5k-token peak, refund closed, no `read_scratch` at all) and
+  on `naive` (2 calls, then a request nobody could send). Quoted from real runs, including
+  the actual `kept:` payload the engine leaves behind.
+- `SurrogatePolicy` no longer emits a duplicated `target_skus` entry when the same sku
+  appears in both the task brief and the ticket body.
+
 ## [0.6.0] - 2026-09-19
 
 Offloading stops being a tax and becomes the mechanism that saves a run.

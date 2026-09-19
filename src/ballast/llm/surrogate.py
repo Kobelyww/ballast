@@ -692,7 +692,9 @@ class _Transcript:
             kind = "coupon"
         address_match = _ADDRESS_RE.search(blob)
         batch = any(w in blob for w in ("所有", "批量", "全部"))
-        skus = _SKU_RE.findall(blob)
+        # Order-preserving dedupe: the same sku appears in the task brief and in the
+        # ticket body, and a duplicated target list is noise a reviewer reads as a bug.
+        skus = list(dict.fromkeys(_SKU_RE.findall(blob)))
         if batch:
             remaining = [tid for tid in self.queue_tickets(use_state=True) if tid not in self.handled_tickets()]
             ticket = remaining[0] if remaining else None
