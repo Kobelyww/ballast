@@ -1,6 +1,6 @@
 [project]
 name = "ballast"
-version = "0.7.0"
+version = "0.8.0"
 description = "Budget-aware agent runtime + cost/quality benchmark for LLM agents. Zero runtime dependencies."
 readme = "README.md"
 requires-python = ">=3.11"

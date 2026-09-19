@@ -1,6 +1,7 @@
 # Changelog
 
-## [0.7.0] - 2026-09-19
+## [0.8.0] - 2026-09-19
+
 
 A worked trace pair, and the retraction of a headline reliability number that turned out to be
 an assumption.
