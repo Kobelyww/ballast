@@ -27,6 +27,7 @@ EventType = Literal[
     "tool_rejected",
     "loop_guard",
     "guardrail_block",
+    "injection_suspected",
     "offload",
     "compact",
     "approval_request",
@@ -72,6 +73,8 @@ class RunContext:
     approvals: list[dict[str, Any]] = field(default_factory=list)
     guardrail_blocks: int = 0
     rejected_calls: int = 0
+    injections_detected: int = 0
+    payloads_fenced: int = 0
     compactions: int = 0
     saved_tokens: int = 0
     critic_rounds: int = 0

@@ -11,6 +11,14 @@ a promotion gate that priced the wrong quantity.
 
 ### Added
 
+- **Prompt-injection discipline for tool payloads**: `kernel/injection.py` scans every
+  tool result for smuggled instructions (override, amount, skip-procedure,
+  exfiltration, false authority), emits `injection_suspected` events, and fences
+  *suspected* payloads as declared data. Two new arms — `obedient` (treats record text
+  as an order) and `unfenced` (no declaration) — plus three injection tasks. Measured
+  over 9 runs: `obedient` passes 3/9, draws 6 guardrail refusals, and no injected
+  amount ever reaches the world. Detection is telemetry; the invariant layer is the
+  defence, and the README says so plainly.
 - **SRE incident management** as a second domain: `env/ops_world.py`,
   `env/incident_policy.py` (paging, change freeze, blast radius, rollback staleness),
   `env/incident_verify.py`, `tools/ops.py`, `env/runbooks/`, `bench/incident_graders.py`

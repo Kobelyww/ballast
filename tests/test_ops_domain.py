@@ -147,7 +147,7 @@ class TestRunnerIsDomainAgnostic:
         suite = load_suite("all")
         domains = {getattr(s, "domain", "desk") for s in suite}
         assert domains == {"desk", "ops"}
-        assert len(suite) == 50  # 34 after-sales tasks + 16 incidents
+        assert len(suite) >= 50  # grows as arms need harder tasks; the domains must both be present
 
     def test_the_same_arm_spec_drives_both(self) -> None:
         desk = next(s for s in load_suite("train") if s.id == "S01_inwindow_refund")

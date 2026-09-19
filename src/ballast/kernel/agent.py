@@ -32,6 +32,8 @@ from .budget import BudgetExceeded, RunBudget, UsageLedger
 from ..context.engine import STATE_HEADER
 from .events import HitlMode, RunContext
 from .hitl import Interrupt
+from .injection import fence as fence_payload
+from .injection import scan as scan_injection
 from .toolkit import Tool, ToolResult, Toolkit
 
 Strategy = Literal["react", "plan_execute", "reflexion", "hierarchical"]
@@ -80,6 +82,7 @@ class AgentConfig:
     enable_sop_briefing: bool = True
     enable_skills: bool = False
     soft_degrade: bool = True
+    fence_untrusted: bool = True
     checkpointer: Any = None
     max_repair_attempts: int = 2
     # Invariants are a property of the domain, not of the runtime: callable
@@ -310,7 +313,18 @@ class Agent:
                     result = self._execute(ctx, tc)
                     if result is None:  # pragma: no cover - guarded by Interrupt
                         raise Interrupt(ctx.pending_interrupt or {"run_id": ctx.run_id})
-                    engine.tool_result(tc.id, tc.name, result.content)
+                    payload = result.content
+                    found = scan_injection(payload)
+                    if found.suspected:
+                        ctx.injections_detected += len(found.codes)
+                        ctx.emit("injection_suspected", tool=tc.name, codes=found.codes, snippets=found.text_snippets, fenced=cfg.fence_untrusted)
+                    if cfg.fence_untrusted and found.suspected:
+                        # Only suspected payloads get wrapped. Fencing everything would
+                        # shred machine-readable tool output for no extra safety, and a
+                        # defence that breaks the happy path is not a defence.
+                        payload = fence_payload(payload)
+                        ctx.payloads_fenced += 1
+                    engine.tool_result(tc.id, tc.name, payload)
                     blocked = bool(result.error) and (result.error or {}).get("error") != "repeated_call"
                     repeated_only = repeated_only and not (result.ok or blocked)
                     if not result.ok:
