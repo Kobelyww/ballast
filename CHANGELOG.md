@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Prompt-injection discipline for tool payloads: `kernel/injection.py`, `obedient` and `unfenced` arms,
+  three injection tasks, and a README section on what a runtime can actually promise here.
+
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); the project is pre-1.0 and the runtime
 API may change.
