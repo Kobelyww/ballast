@@ -88,6 +88,28 @@ tool is in `offload_exempt` are pinned forward through compaction. This is the s
 most instructive bug found by the benchmark: it surfaced as `ballast` scoring 88.2%
 against `naive`'s 100%.
 
+### What a digest is allowed to assert
+
+Folding a block out of the window does not delete its history: the digest keeps a
+`- invoked search_sop({...})` line, so a reader can still tell the work was done. What
+it cannot tell is *what came back* — a digest line carries the arguments and the
+`_KEY_FACT` fields of the result, nothing else. That asymmetry is a contract, and two
+components have to honour it:
+
+* **the policy** may treat a folded read as finished (that is what `saw()` does, via
+  `_FOLD_CREDITED_READS`) but must not treat a folded *effect* as paid — a digest is
+  evidence you looked, never evidence you moved money;
+* **the repeat guard** must not refuse a re-read whose usable copy is gone.
+  `ContextEngine.holds_result()` answers that question, and the guard grants exactly one
+  more look when the answer is no. Refusing there is the runtime punishing an agent for a
+  hole the runtime dug; the earlier text of that error asserted the result "is already in
+  your context", which after compaction is simply untrue.
+
+When a required payload is gone, the correct repair is to re-fetch it *with different
+arguments* — the same verbatim call is what the guard exists to stop. `SurrogatePolicy`
+does this for the SOP citation `close_ticket` demands, scoped per ticket. Found by the
+12→48-ticket ladder, which failed 3/36 before it and passes 36/36 after.
+
 ## Memory and the promotion gate
 
 `memory/distill.py` turns a *graded-correct* trace into a `candidate` card — the input

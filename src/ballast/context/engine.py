@@ -158,6 +158,23 @@ class ContextEngine:
                 return str(message.get("content", ""))
         return ""
 
+    def holds_result(self, name: str) -> bool:
+        """Is a *usable* result for this tool still in the window?
+
+        The repeat guard needs this question. Telling an agent "the previous result is
+        already in your context" after compaction folded that result away is not a hint,
+        it is a lie — and the run then dies on a blind spot the runtime itself created.
+        A preview carrying a `scratch://` handle counts as no: the bytes are reachable
+        only by paying for a retrieval.
+        """
+        for msg in self.transcript:
+            if msg.get("role") != "tool" or msg.get("name") != name:
+                continue
+            if "moved out of context" in str(msg.get("content", "")):
+                continue
+            return True
+        return False
+
     # --------------------------------------------------------------- assembly
     def assemble(self) -> list[dict[str, Any]]:
         """Return the exact message list to send, compacting first if over budget."""
@@ -166,7 +183,7 @@ class ContextEngine:
             self._maybe_compact()
         messages = [*self.pins]
         if self.summary:
-            messages.append(system_message(f"[earlier context folded]\n{self.summary}"))
+            messages.append(system_message(f"{FOLD_MARKER}\n{self.summary}"))
         messages.extend(self.transcript)
         self.stats.prompt_tokens = estimate_message_tokens(messages)
         self.stats.peak_prompt_tokens = max(self.stats.peak_prompt_tokens, self.stats.prompt_tokens)
@@ -244,6 +261,11 @@ def _at_boundary(text: str, *, tail: bool = False) -> str:
 
 
 _KEY_FACT = ("order_id", "customer_id", "amount", "paid_amount", "refund_id", "coupon_id", "status", "risk_score", "tier", "handle")
+
+#: Header of the message that carries the compaction digest. Downstream readers —
+#: including the surrogate policy, which must judge a run on exactly the context the
+#: runtime delivered — match on this instead of re-typing the string.
+FOLD_MARKER = "[earlier context folded]"
 
 
 def extractive_summary(messages: list[dict[str, Any]], previous: str | None = None) -> str:

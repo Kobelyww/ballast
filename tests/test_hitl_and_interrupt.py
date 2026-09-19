@@ -270,6 +270,27 @@ class TestInterruptThroughALiveRun:
         assert "call_0" in replies and "call_0" not in asked_for
         assert "call_6" in asked_for and "call_6" not in replies
 
+    def test_a_read_whose_payload_left_the_window_earns_a_re_read(self) -> None:
+        """The repeat guard stops spinning; it must not punish a gap the runtime dug.
+
+        Scope note, measured rather than assumed: this grant fires when *no* usable copy
+        of the result is left in the window — which is the offload case (the payload is
+        behind a `scratch://` handle) and the tail of a long compaction. It does not fire
+        for a read whose newest result is still on screen, and should not: there the
+        refusal is correct, because the agent can act on what it can see.
+        """
+        h = Harness(
+            "S01_inwindow_refund",
+            context={"token_budget": 4_000, "offload_threshold": 60, "enable_compaction": False},
+        )
+        args = {"query": "退款 无理由 政策 窗口 计算", "top_k": 3}
+        result = h.run([call_step(i, "search_sop", **args) for i in range(1, 13)])
+        guard = [e for e in result.events if e["type"] == "loop_guard"]
+        assert guard, "the repeat guard is what this run is exercising"
+        assert all(e["payload"].get("re_read") for e in guard), [e["payload"] for e in guard]
+        assert result.rejected_calls == 0
+        assert result.context.get("offloads"), "the payload has to actually leave the window"
+
     def test_repeated_refund_calls_are_capped_by_the_loop_guard(self) -> None:
         h = Harness("S01_inwindow_refund")
         script: list[Any] = [
@@ -284,3 +305,7 @@ class TestInterruptThroughALiveRun:
         assert guard and guard[0]["payload"]["name"] == "issue_refund"
         assert result.rejected_calls >= 1
         assert len(h.world.state()["refunds"]) <= 1
+        # The re-read grant is for reads only. An effect whose evidence left the window
+        # is exactly the case that must stay refused: "I can't see the earlier refund"
+        # is not a licence to make another one.
+        assert all("re_read" not in e["payload"] for e in guard)

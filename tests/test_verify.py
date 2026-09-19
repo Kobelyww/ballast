@@ -125,6 +125,16 @@ class TestTicketInvariants:
         )
         assert audit(world, sop_ids=SOP_IDS, ticket_id="T1042") == []
 
+    def test_a_citation_is_only_owed_for_disposals_the_run_made(self) -> None:
+        """Batch decks pre-resolve decoy tickets as scenery. With `ticket_id=None` the
+        audit used to sweep every resolved ticket in the world, which reported
+        `missing_policy_citation` against summaries no agent ever wrote — and the 36-ticket
+        ladder billed both arms for its own stage dressing."""
+        world, _ = world_for("L36_batch")
+        sealed = [t["id"] for t in world.state()["tickets"] if t["status"] == "resolved"]
+        assert sealed, "the ladder is meant to seed pre-resolved decoys"
+        assert audit(world, sop_ids=SOP_IDS, ticket_id=None) == []
+
     def test_money_resolution_without_an_amount_is_a_weakness(self) -> None:
         world, _ = world_for("S01_inwindow_refund")
         world.update_ticket(ticket_id="T1042", status="resolved", resolution="refunded", summary="依据 refund_policy::七天无理由退货 已完成退款处理并结单。")

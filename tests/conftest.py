@@ -202,7 +202,17 @@ def train_runs() -> list[tuple[Scenario, Any, Grade, dict[str, Any]]]:
     return out
 
 
-#: Tasks the deliberately-hard tier contains: the controlled arm spends far fewer
-#: tokens on them and still does not finish, which is a result to publish, not a cell
-#: to delete. Two test modules need this list; it lives here so they cannot drift.
-HARD_TIER = {"S17_fat_order", "S18_batch_queue", "B24_verbose_batch"}
+#: Tasks the controlled arm is *known* not to finish. The list used to hold
+#: S17_fat_order and S18_batch_queue, both of which died with `stalled`; they now pass.
+#: What the 12/16/24/36/48-ticket ladder actually exposed was a mismatch inside the
+#: harness's own evidence model: compaction folds a tool result but keeps a
+#: `- invoked search_sop(...)` line in the digest, so the run knew it had searched and
+#: could no longer see the section id it was required to quote. `close_ticket` refused
+#: the summary, the repeat guard refused the retry, and the run stopped. Reading the
+#: digest for reads (not effects) and re-fetching a citation the agent can no longer see
+#: is what fixed it; the grader's habit of charging the run for pre-resolved decoy
+#: tickets was a second, separate bug.
+#: What remains is L48_batch, where both arms hit the shared ¥6 ceiling: the cheap arm
+#: gets 39/48 tickets done, the naive arm 37/48. That is a result to publish, not a
+#: cell to delete. Two test modules read this list; it lives here so they cannot drift.
+HARD_TIER = {"L48_batch"}

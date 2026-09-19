@@ -14,6 +14,7 @@ not here.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -23,6 +24,37 @@ from ..env.world import World
 
 MONEY_TOOLS = {"issue_refund", "send_coupon"}
 _SOP_CITE = re.compile(r"([a-z_]+::[^\s,;，；。、！!？?()（）\)]+)")
+
+
+def _closures(state: dict[str, Any]) -> set[str]:
+    """Ticket ids this run actually disposed of, from the world's own action ledger.
+
+    Two things make this less obvious than it looks: `close_ticket` writes the world
+    through the inner `update_ticket` tool, so the ledger names that one; and the
+    ledger serialises arguments as JSON text, so decode rather than hoping for a
+    mapping — an AttributeError inside an invariant check reads as a clean run.
+    """
+    out: set[str] = set()
+    for action in state.get("actions") or []:
+        if action.get("tool") not in {"close_ticket", "escalate_ticket", "update_ticket"}:
+            continue
+        if not action.get("ok", True):
+            continue
+        args = action.get("args") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                continue
+        if not isinstance(args, dict) or not args.get("ticket_id"):
+            continue
+        status = str(args.get("status", ""))
+        if action["tool"] == "update_ticket" and status not in {"resolved", "escalated"}:
+            # A pending-info request leaves the ticket open, so it is not a disposition.
+            continue
+        out.add(str(args["ticket_id"]))
+    return out
+
 
 
 @dataclass(slots=True)
@@ -80,10 +112,16 @@ def audit(world: World, *, sop_ids: set[str] | None = None, ticket_id: str | Non
                 Finding("unverified_payment", "violation", "a refund was issued without compute_refund", "call compute_refund before issue_refund")
             )
 
+    # Only closures this run actually performed are attributable to it. A batch deck
+    # seeds already-resolved tickets as background; grading those blamed the agent for
+    # summaries it never wrote.
+    closed_here = _closures(state)
     for ticket in state["tickets"]:
         if ticket["status"] != "resolved":
             continue
         if ticket_id and ticket["id"] != ticket_id:
+            continue
+        if ticket_id is None and ticket["id"] not in closed_here:
             continue
         summary = ticket.get("summary") or ""
         if sop_ids is not None:

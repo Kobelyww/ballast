@@ -69,6 +69,60 @@ losing it. That turnaround is the argument for the whole project: without paired
 this reads as "our agent is sometimes flaky on long tasks", and the two-line cause stays
 invisible.
 
+## The bug that reversed the hard tier
+
+That fix moved the failure horizon from 12 tickets to 24, so the suite grew a ladder —
+12, 16, 24, 36, 48 tickets — and the controlled arm promptly failed all of them it had
+previously been credited with. The trace of `L24_batch` is the whole story:
+
+```
+step 117  issue_refund(SOL24017, 126.00)            ok
+step 118  search_sop("退款 无理由 政策 窗口 计算")   refused: repeated_call
+step 119  search_sop("退款 无理由 政策 窗口 计算")   refused → run closed out as `stalled`
+```
+
+Four things were wrong at once, and every one of them is a mechanism other agent runtimes have:
+
+1. **Compaction kept the receipt and threw away the goods.** A folded block still
+   contributes `- invoked search_sop(...)` to the digest, so the run *knew* it had
+   searched the policy corpus — while the section ids that call returned were gone. The
+   agent was confidently unable to cite, and `close_ticket` (correctly) rejects an
+   uncited summary.
+2. **The repeat guard then refused the only recovery available.** Its message asserted
+   "the previous result is already in your context" — after compaction, a lie. Refusing
+   a re-read whose evidence the runtime destroyed is the guard punishing the agent for a
+   gap the guard's own layer created, so the guard now asks the context engine whether a
+   usable copy survives (`ContextEngine.holds_result`) and grants one re-read when none
+   does. Effects are excluded, always: not seeing the earlier refund is not permission
+   to make another one. Being straight about how much this one bought: in this suite the
+   grant fires on the *offload* path, where the payload sits behind a handle. On the
+   folded path a newer copy of the same read usually survives, so the refusal still
+   stands — correctly, since there is nothing to recover. What actually unblocked the
+   ladder was the next line.
+3. **A policy that cannot see its own citation has to go get it.** The run still owed
+   `close_ticket` a section id, so it now re-fetches the SOP scoped to the ticket in hand
+   — and scoped, not verbatim, because an identical query is exactly what the repeat guard
+   refuses. That is the general shape: *detect the gap from the payload you need, not
+   from the marker you lost.*
+4. **The grader charged the run for its own scenery.** The 36-ticket deck seeds six
+   decoy tickets as already-resolved background. The invariant sweep looked at *every*
+   resolved ticket, so both arms were failed for `missing_policy_citation` on summaries
+   nobody wrote. Attribution is now by ledger evidence: a run owns the dispositions it
+   performed.
+
+What each side of that split is worth, measured on the same deck before and after:
+
+| Task | before | after |
+| --- | --- | --- |
+| `L16_fat_batch` | 5/16, `stalled` | **16/16 ok**, 705k tokens vs naive's 913k |
+| `L24_batch` | 17/24, `stalled` | **24/24 ok**, 1.31M vs 1.69M |
+| `L36_batch` | 3/36, `stalled` | **36/36 ok**, ¥4.79 vs ¥8.06 |
+| `L48_batch` | 2/48, `stalled` | 39/48 — and the naive arm gets **37/48**; both stop at the shared ¥6 ceiling |
+
+The read-side of fix (1) is deliberately narrow, and `_FOLD_CREDITED_READS` says so: a
+digest may vouch for a *read*, never for an *effect*. That distinction is the whole
+difference between an agent that resumes correctly and one that pays twice.
+
 ## Prompt injection: what the runtime can and cannot promise
 
 Three tasks put an instruction *inside* a customer-authored record — "ignore previous
@@ -180,18 +234,21 @@ Read these before trusting the table above; they are the interesting part.
   the run. Retuning to 1,200 tokens restored parity. Both results are reproducible;
   the lesson is that "context engineering" is a measurable trade-off, not a free win,
   and a framework without an ablation harness will not notice.
-- **The hard tier is one task deep.** `B24_verbose_batch` fails at 12/24 on the
-  controlled arm and is the *only* place in the suite where spending less costs
-  capability. One such task is a curiosity, not a regime: the right next contribution is
-  a ladder of them (12 / 24 / 48 verbose-ticket batches, mixed-shape queues) so the
-  crossover's failure side has error bars too. The tests reference it through a single
-  `conftest.HARD_TIER` list, so it cannot be quietly forgotten. If your runs are short, run `naive` — the
-  benchmark says so explicitly, which is the point of having one.
-- **Long-horizon coverage is thin.** `S17_fat_order` (40-line order) and
-  `S18_batch_queue` (5 tickets in one context) exercise offload-then-refetch and
-  multi-goal transcripts, but both pass only under the tuned policy and neither has a
-  variant that is *harder* still. If you have a long-horizon suite, this project wants
-  it.
+- **The hard tier is one task deep, and it is a *budget* wall, not a context one.**
+  `L48_batch` is the only task left where the controlled arm does not finish: at 48
+  tickets both arms run into the shared ¥6 ceiling, the cheap arm at 39/48 and the naive
+  arm at 37/48. Two tickets apart is not an ordering — it is evidence that past some size
+  the binding constraint is the wallet, not the window. The earlier version of this bullet
+  asked for a ladder so the failure side of the crossover could have error bars; the
+  ladder (12/16/24/36/48) is in, and what it found was a bug rather than a regime — see
+  "The bug that reversed the hard tier". The tests still reference the hard tier through a
+  single `conftest.HARD_TIER` list, so it cannot be quietly forgotten. If your runs are
+  short, run `naive` — the benchmark says so explicitly, which is the point of having one.
+- **Every ladder cell is 3 draws.** The crossover and the ladder are the same
+  surrogate replayed, so a cell has no model variance at all; `pass^3` widens the
+  interval but cannot make `L36` vs `L48` a comparison of *capability* when both are
+  stopped by the same ceiling. Read those two rows as "where the budget binds", not as a
+  ranking.
 - Skill-card *utility* is simulated through machine-readable triggers the surrogate is
   *made* to obey; with a real provider the same gate measures actual instruction
   following, but that transfer is not yet demonstrated.

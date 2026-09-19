@@ -21,11 +21,17 @@ from ballast.bench.runner import resolve_arm
 from ballast.env.fixtures import Scenario
 from ballast.env.policies import HIGH_RISK_SCORE
 from ballast.kernel.verify import audit, violations
+from ballast.llm.base import Pricing
 from conftest import assert_tool_calls_answered
 
-# S17 and S18 are the long-horizon cases: they are tracked as known-failing tasks, so
-# only the invariants below are asserted there - never the grade.
-# Shared with test_end_to_end via conftest so the two lists cannot disagree.
+#: Ceiling for a single completion, used to price the one request that may legitimately
+#: be billed after a ceiling is crossed. The surrogate stays near 50 tokens; a real
+#: model with `max_tokens` set at the arm's cap is what this has to cover.
+_MAX_COMPLETION_TOKENS = 1_024
+
+# The hard tier is long-horizon by construction: on those tasks only the invariants
+# below are asserted, never the grade. Shared with test_end_to_end via conftest so the
+# two lists cannot disagree.
 from conftest import HARD_TIER as KNOWN_FAILING_LONG_HORIZON
 
 
@@ -212,13 +218,26 @@ class TestCostIsReal:
         self, train_runs_session: list[tuple[Scenario, Any, Grade, dict[str, Any]]]
     ) -> None:
         ceiling = resolve_arm("ballast").budget
+        pricing = Pricing()
+        # The ceilings are enforced *before* the billable request, so the call already in
+        # flight when one is reached still gets billed. Worst-case price of a single
+        # request is therefore part of the contract rather than a breach of it: a run
+        # that could never overshoot would have to abort mid-request, which is not a
+        # thing a provider can be asked to do.
+        one_call = (
+            pricing.input_per_m * ceiling["max_prompt_tokens"] / 1e6
+            + pricing.output_per_m * _MAX_COMPLETION_TOKENS / 1e6
+        )
         for scenario, row, _grade, _extras in train_runs_session:
-            assert row.cost <= ceiling["max_cost"], f"{scenario.id} breached the cost ceiling: {row.cost}"
+            assert row.cost <= ceiling["max_cost"] + one_call, f"{scenario.id} breached the cost ceiling: {row.cost}"
             # `begin_call` charges the step before the request, so a run can only ever
             # overshoot the step ceiling by the two steps the final degrade stage buys.
             assert row.steps <= ceiling["max_steps"] + 2, f"{scenario.id} breached the step ceiling: {row.steps}"
             assert row.prompt_tokens_peak <= ceiling["max_prompt_tokens"], f"{scenario.id}: peak {row.prompt_tokens_peak}"
-            assert row.wall_s < 5.0, f"{scenario.id} took {row.wall_s}s"
+            # This one is a hang guard, so it scales with the work: a 48-ticket batch is
+            # a few hundred surrogate steps, and a flat wall-clock cap would only measure
+            # the speed of the CI box.
+            assert row.wall_s <= max(5.0, row.steps * 0.05), f"{scenario.id} took {row.wall_s}s"
 
 
 class TestGradeIsNotVacuous:

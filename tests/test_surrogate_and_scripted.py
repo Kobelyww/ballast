@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from ballast.context.engine import FOLD_MARKER
 from ballast.env.fixtures import by_id
 from ballast.llm.base import ChatRequest, ChatResponse, ToolCall, Usage, user_message
 from ballast.llm.surrogate import ScriptedModel, SurrogatePolicy, SurrogateProfile, _Transcript
@@ -35,6 +36,17 @@ def assistant_call(name: str, arguments: dict, call_id: str = "c1") -> dict[str,
         "content": "",
         "tool_calls": [{"id": call_id, "type": "function", "function": {"name": name, "arguments": json.dumps(arguments, ensure_ascii=False)}}],
     }
+
+
+def _digest(body: str) -> dict[str, Any]:
+    """The message a compaction actually delivers: the marker line, then the digest."""
+    return {"role": "system", "content": f"{FOLD_MARKER}\n{body}"}
+
+
+def _invoked(name: str, scope: str) -> str:
+    """A digest line in the exact shape `extractive_summary` writes one in."""
+    arguments = json.dumps({"order_id": scope}, ensure_ascii=False)
+    return "- invoked " + name + "(" + arguments + ")\n"
 
 
 class TestScriptedModel:
@@ -262,6 +274,30 @@ class TestTranscriptReads:
         ).escalation_note({"reason_code": "high_risk", "amount": 1999.0})
         assert "escalation::必须升级人工的情形" in note and "1999.00" in note
         assert "候选方案" in note and "建议" in note
+
+    def test_a_folded_read_is_credited_but_its_payload_is_not(self) -> None:
+        """Compaction keeps an `- invoked get_order(...)` line and drops the record it
+        returned. The stand-in has to tell those two apart, because a real model reads
+        the digest: believing it is what stops the run re-issuing a read it already did,
+        while `result_of` still has to come back empty.
+
+        An effect is never credited from a digest. Reading "invoked issue_refund" in a
+        summary is not permission to assume the money moved.
+        """
+        transcript = _Transcript([_digest(_invoked("get_order", "SO20261042") + _invoked("issue_refund", "SO20261042"))])
+        assert transcript.saw("get_order", scope="SO20261042")
+        assert transcript.saw("get_ticket", scope="T1042") is False
+        assert transcript.result_of("get_order", "SO20261042") is None
+        assert not transcript.saw("issue_refund", scope="SO20261042")
+
+    def test_a_scope_the_digest_truncated_away_is_not_credited(self) -> None:
+        """The digest shortens each line at 120 characters, so a scope past the cut is
+        one nobody can resolve. Crediting it would let the runtime claim work happened on
+        evidence no reader can see."""
+        arguments = json.dumps({"note": "x" * 300, "order_id": "SO20261042"}, ensure_ascii=False)
+        transcript = _Transcript([_digest("- invoked get_order(" + arguments[:120] + "…)\n")])
+        assert not transcript.saw("get_order", scope="SO20261042")
+        assert transcript.saw("get_order")
 
     def test_claim_type_table(self) -> None:
         transcript = _Transcript([])

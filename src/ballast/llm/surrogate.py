@@ -29,7 +29,25 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..context.engine import FOLD_MARKER
 from ..llm.base import ChatRequest, ChatResponse, ToolCall, Usage
+
+#: Reads the compaction digest is allowed to vouch for. Deliberately side-effect free:
+#: a folded line proves the agent *looked*, and a real model would act on that. It can
+#: never prove the agent *paid* — crediting effects from a digest is how a run refunds
+#: an order twice, which is the one mistake no amount of context engineering buys back.
+_FOLD_CREDITED_READS = frozenset(
+    {
+        "list_tickets",
+        "list_orders_by_phone",
+        "get_ticket",
+        "get_order",
+        "get_customer",
+        "search_sop",
+        "compute_refund",
+        "check_coupon_eligibility",
+    }
+)
 
 _TICKET_RE = re.compile(r"(T\d{4})")
 _OFFLOADED_RE = re.compile(r"output (\d+)t moved out of context -> (scratch://[^\s\]]+)", re.I)
@@ -120,7 +138,7 @@ class SurrogatePolicy:
         if intent.ticket and intent.ticket in t.handled_tickets() and not intent.batch:
             return None
 
-        if intent.batch and not t.saw("list_tickets"):
+        if intent.batch and not (t.queue_tickets(use_state=True) or t.saw("list_tickets")):
             return "list_tickets", {"status": "open", "limit": 50}
 
         if not intent.ticket:
@@ -167,6 +185,12 @@ class SurrogatePolicy:
 
         if not t.saw("search_sop"):
             return "search_sop", {"query": t.sop_query(intent.kind), "top_k": 3}
+        if not t.cited_section() and ticket not in t.handled_tickets():
+            # Compaction kept the marker that we searched and dropped the section ids it
+            # returned. `close_ticket` will not accept a summary that cites nothing, so
+            # the citation has to be fetched back — scoped to this ticket, because an
+            # identical query is exactly what the runtime's repeat guard rejects.
+            return "search_sop", {"query": f"{t.sop_query(intent.kind)} {ticket}", "top_k": 3}
 
         if intent.kind == "address":
             return self._address_flow(t, order, intent)
@@ -328,6 +352,7 @@ class _Transcript:
         self.messages = messages
         self._results: dict[str, list[dict[str, Any]]] | None = None
         self._handles: dict[str, str] = {}
+        self._fold: str | None = None
 
     # ------------------------------------------------------------------ reads
     def _unwrap(self, raw: str) -> str:
@@ -390,17 +415,49 @@ class _Transcript:
                 return str(last["_offloaded"])
         return None
 
+    def _fold_text(self) -> str:
+        """The compaction digest, verbatim as the runtime delivered it.
+
+        Folding a block does not delete its history: the summary keeps an
+        `- invoked get_order({...})` line. A real model reads that line and knows it
+        already looked; a stand-in that only scans live tool rows re-issues the call,
+        trips the loop guard and dies. Reading the digest is the faithful behaviour.
+        """
+        if self._fold is None:
+            self._fold = "\n".join(
+                str(msg.get("content", ""))
+                for msg in self.messages
+                if msg.get("role") == "system" and FOLD_MARKER in str(msg.get("content", ""))
+            )
+        return self._fold
+
+    def _folded(self, name: str, scope: str | None) -> bool:
+        if name not in _FOLD_CREDITED_READS:
+            return False
+        fold = self._fold_text()
+        if not fold:
+            return False
+        for line in fold.splitlines():
+            if not (line.startswith(f"- invoked {name}(") or line.startswith(f"- {name} ->")):
+                continue
+            if scope is None or scope in line:
+                return True
+        return False
+
     def saw(self, name: str, *, scope: str | None = None) -> bool:
         """True only when the tool has a result that is not an error.
 
         `scope` matters in a batch run: a order-scoped read made for ticket #1 is not
         evidence about ticket #2, and treating it as such is how an agent refunds the
-        wrong order.
+        wrong order. A folded-away read still counts (see `_fold_text`); a folded-away
+        *effect* does not — the digest is evidence you looked, never evidence you paid.
         """
         rows = self._tool_results().get(name) or []
         if scope is None:
-            return any("error" not in row for row in rows)
-        return any("error" not in row and _matches(row, scope) for row in rows)
+            hit = any("error" not in row for row in rows)
+        else:
+            hit = any("error" not in row and _matches(row, scope) for row in rows)
+        return hit or self._folded(name, scope)
 
     def result_for(self, name: str, scope: str | None = None) -> dict[str, Any] | None:
         rows = self._tool_results().get(name) or []
@@ -543,7 +600,19 @@ class _Transcript:
                 return match.group(1)
         return None
 
-    def queue_tickets(self) -> list[str]:
+    def queue_tickets(self, *, use_state: bool = False) -> list[str]:
+        """The work list. `use_state` reads the runtime's pinned copy, which survives
+        compaction — what a batch run needs. A single-ticket run must not: finding a
+        40-item queue in context would be mistaken for a to-do list.
+        """
+        if use_state:
+            for msg in self.messages:
+                if msg.get("role") != "system" or "RUN STATE" not in str(msg.get("content", "")):
+                    continue
+                line = next((ln for ln in str(msg["content"]).splitlines() if ln.startswith("queue_seen_open:")), "")
+                ids = [x for x in line.split(":", 1)[1].strip().split(", ") if x.startswith("T")] if line else []
+                if ids:
+                    return ids
         out: list[str] = []
         for row in self._tool_results().get("list_tickets") or []:
             for item in row.get("tickets") or []:
@@ -593,7 +662,7 @@ class _Transcript:
         batch = any(w in blob for w in ("所有", "批量", "全部"))
         skus = _SKU_RE.findall(blob)
         if batch:
-            remaining = [tid for tid in self.queue_tickets() if tid not in self.handled_tickets()]
+            remaining = [tid for tid in self.queue_tickets(use_state=True) if tid not in self.handled_tickets()]
             ticket = remaining[0] if remaining else None
         elif ticket is None:
             located = self.order_ids()

@@ -468,10 +468,13 @@ class Recording:
 
 
 class TestWholeSuiteRuntime:
-    def test_the_train_slice_runs_under_a_second_per_scenario(self) -> None:
+    def test_the_train_slice_finishes_inside_a_step_scaled_time_limit(self) -> None:
+        """A hang guard, not a performance claim: it scales with the steps a task takes,
+        so a 48-ticket batch is allowed to take a batch's work while a 20-step task that
+        spends a minute still fails."""
         slow = []
         for scenario in train_slice():
             row, _g, _e = run_scenario(scenario, BALLAST)
-            if row.wall_s > 5.0:
+            if row.wall_s > max(5.0, row.steps * 0.05):
                 slow.append((scenario.id, row.wall_s))
         assert slow == []

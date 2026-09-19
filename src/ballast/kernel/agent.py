@@ -310,7 +310,7 @@ class Agent:
                         ctx.pending_interrupt["call_id"] = tc.id
                         ctx.extra["pending_calls"] = executed_calls
                         raise Interrupt(ctx.pending_interrupt)
-                    result = self._execute(ctx, tc)
+                    result = self._execute(ctx, tc, engine)
                     if result is None:  # pragma: no cover - guarded by Interrupt
                         raise Interrupt(ctx.pending_interrupt or {"run_id": ctx.run_id})
                     payload = result.content
@@ -401,7 +401,7 @@ class Agent:
         lines.append("These are facts the runtime confirmed, not guesses. Do not redo work listed here.")
         return "\n".join(lines)
 
-    def _execute(self, ctx: RunContext, tc: Any) -> Any:
+    def _execute(self, ctx: RunContext, tc: Any, engine: ContextEngine | None = None) -> Any:
         """Dispatch with resume-safety: a call already executed under this run replays."""
         key = f"{ctx.run_id}:{tc.id}"
         memo = ctx.extra.setdefault("idempotent", {})
@@ -416,22 +416,34 @@ class Agent:
         tool_ = self.config.toolkit.get(tc.name)
         ceiling = 2 if (tool_ and tool_.mutating) else 8
         if seen[signature] > ceiling:
-            ctx.rejected_calls += 1
-            ctx.emit("loop_guard", name=tc.name, times=seen[signature], arguments=tc.arguments)
-            return ToolResult(
-                name=tc.name,
-                ok=False,
-                content=json.dumps(
-                    {
-                        "error": "repeated_call",
-                        "message": f"{tc.name} was already called with exactly these arguments {seen[signature] - 1} times",
-                        "hint": "the previous result is already in your context; act on it, change your arguments, or escalate. Repeating it will not change it.",
-                        "retryable": False,
-                    },
-                    ensure_ascii=False,
-                ),
-                error={"error": "repeated_call"},
-            )
+            stale = engine is not None and not engine.holds_result(tc.name)
+            if stale and not (tool_ and tool_.mutating):
+                # The evidence for this call left the window — compaction folded it, or
+                # offload replaced it with a handle. Refusing the re-read would punish
+                # the agent for a gap the runtime created, so one more look is granted
+                # and the counter restarts rather than accumulating.
+                seen[signature] = 1
+                ctx.extra["re_read_granted"] = int(ctx.extra.get("re_read_granted", 0)) + 1
+                ctx.emit("loop_guard", name=tc.name, times=ceiling + 1, re_read=True,
+                         arguments=tc.arguments)
+            else:
+                ctx.rejected_calls += 1
+                ctx.emit("loop_guard", name=tc.name, times=seen[signature], arguments=tc.arguments)
+                held = "already in your context" if not stale else "no longer in your context: it was compacted away. Re-read it once with narrower arguments"
+                return ToolResult(
+                    name=tc.name,
+                    ok=False,
+                    content=json.dumps(
+                        {
+                            "error": "repeated_call",
+                            "message": f"{tc.name} was already called with exactly these arguments {seen[signature] - 1} times",
+                            "hint": f"the previous result is {held}; act on it, change your arguments, or escalate.",
+                            "retryable": False,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    error={"error": "repeated_call"},
+                )
         ctx.emit("tool_call", name=tc.name, call_id=tc.id, arguments=tc.arguments)
         result = self.config.toolkit.execute(tc.name, tc.arguments, call_id=tc.id)
         if result.validation_problems:

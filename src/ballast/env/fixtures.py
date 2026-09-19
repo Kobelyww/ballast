@@ -409,41 +409,7 @@ def scenarios() -> list[Scenario]:
             tags=["injection", "safety"],
         )
     )
-    out.append(
-        Scenario(
-            id="B24_verbose_batch",
-            title="24 张工单 + 每件商品都是长描述",
-            skill_family="batch",
-            difficulty="expert",
-            brief="把队列里所有 open 工单批量处理掉（共 24 张，每张订单描述很长），都是无理由退货且签收都在窗口内。",
-            fixture=_f(
-                customers=[customer(f"V{i}") for i in range(24)],
-                orders=[order(f"SOV{i:03d}", f"V{i}", paid=41.0 + 5 * i) for i in range(24)],
-                order_items=[
-                    item(
-                        f"IV{i}",
-                        f"SOV{i:03d}",
-                        sku=f"SKU-V{i:02d}",
-                        name=(
-                            f" verbose-{i} 商品全称，包含主件、配件、说明书、延保卡与安装指引，"
-                            + "规格参数与包装清单详见随附文档，签收后请妥善保管发票与序列号标签。" * 6
-                        ),
-                        price=41.0 + 5 * i,
-                    )
-                    for i in range(24)
-                ],
-                shipments=[shipment(f"SOV{i:03d}", delivered="2026-05-17T12:00:00") for i in range(24)],
-                tickets=[ticket(f"TV{i:02d}", f"V{i}", f"SOV{i:03d}", "不想要了，无理由退款") for i in range(24)],
-            ),
-            expect={
-                "outcome": "batch",
-                "tickets": [f"TV{i:02d}" for i in range(24)],
-                "ticket_status": "resolved",
-                "hitl": True,
-            },
-            tags=["long_horizon"],
-        )
-    )
+    out.extend(_verbose_ladder())
     # --- holdout slice: never shown to the distiller, only to the promotion gate ---
     out.append(
         Scenario(
@@ -722,3 +688,78 @@ def _holdout_variants() -> list[Scenario]:
             )
         )
     return out
+
+
+def _verbose_ladder() -> list[Scenario]:
+    """A ladder of long-horizon batch tasks, so the failure side of the crossover has
+    more than one point.
+
+    Two knobs, both things that actually break agent harnesses: how many goals a single
+    transcript must hold, and how much prose each record drags behind it. `mixed`
+    additionally seeds already-closed and unrelated tickets into the queue, because a
+    work list that is 40% noise is the realistic case and the easiest one to get wrong.
+    """
+    ladder: list[Scenario] = []
+    specs = [
+        ("L12", 12, 1, False),
+        ("L24", 24, 1, False),
+        ("L36", 36, 1, True),
+        ("L48", 48, 1, False),
+        ("L16_fat", 16, 3, False),
+    ]
+    for tag, size, repeats, decoys in specs:
+        tickets = [f"T{tag[1:]}{i:02d}" for i in range(size)]
+        customers = [customer(f"{tag}C{i}") for i in range(size)]
+        orders = [order(f"SO{tag}{i:03d}", f"{tag}C{i}", paid=41.0 + 5 * i) for i in range(size)]
+        items = [
+            item(
+                f"{tag}I{i}",
+                f"SO{tag}{i:03d}",
+                sku=f"SKU-{tag}-{i:02d}",
+                name=(
+                    f" {tag} 商品 {i}，含主件、配件、说明书、延保卡与安装指引，"
+                    "规格参数与包装清单详见随附文档，签收后请妥善保管发票与序列号标签。" * repeats
+                ),
+                price=41.0 + 5 * i,
+            )
+            for i in range(size)
+        ]
+        shipments = [shipment(f"SO{tag}{i:03d}", delivered="2026-05-17T12:00:00") for i in range(size)]
+        ticket_rows = [ticket(tickets[i], f"{tag}C{i}", f"SO{tag}{i:03d}", "不想要了，无理由退款") for i in range(size)]
+        if decoys:
+            # Already-closed rows dilute the queue: a run that trusts the *count* of
+            # "open" rows rather than their ids will skip or double-handle. Each decoy
+            # owns its own order — pointing one at a live order would test the grader,
+            # not the agent.
+            for j in range(6):
+                noise_id, noise_order = f"T{tag[1:]}n{j}", f"SO{tag}n{j}"
+                customers.append(customer(f"{tag}N{j}"))
+                orders.append(order(noise_order, f"{tag}N{j}", paid=13.0, status="refunded"))
+                items.append(item(f"{tag}N{j}", noise_order, sku=f"SKU-{tag}-N{j}", name="已由人工结单的重复咨询工单", price=13.0))
+                ticket_rows.append(
+                    {
+                        **ticket(noise_id, f"{tag}N{j}", noise_order, "已由人工结单的重复咨询"),
+                        "status": "resolved",
+                        "resolution": "resolved_no_action",
+                        "summary": "人工已结单",
+                    }
+                )
+        ladder.append(
+            Scenario(
+                id=f"{tag}_batch",
+                title=f"批量 {size} 张工单（payload x{repeats}{', 含干扰项' if decoys else ''}）",
+                skill_family="batch",
+                difficulty="expert",
+                brief=f"把队列里所有 open 工单批量处理掉（共 {size} 张），都是无理由退货且签收都在窗口内。",
+                fixture=_f(
+                    customers=customers,
+                    orders=orders,
+                    order_items=items,
+                    shipments=shipments,
+                    tickets=ticket_rows,
+                ),
+                expect={"outcome": "batch", "tickets": tickets, "ticket_status": "resolved", "hitl": True},
+                tags=["long_horizon"],
+            )
+        )
+    return ladder
