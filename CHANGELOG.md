@@ -2,16 +2,21 @@
 
 ## [0.8.0] - 2026-09-19
 
-
-A worked trace pair, and the retraction of a headline reliability number that turned out to be
-an assumption.
+Proving the reliability metric can see a thing — the counter-check to 0.7.0's retraction.
 
 - **`tests/test_reliability.py`: the metric is checked against real variance.** The same
   harness driven by a provider whose draws differ, with the variance injected at the
   provider boundary — where a real `temperature > 0` would enter. Measured pass^1→2→3→5
   over 120 runs: 0.642 → 0.417 → 0.300 → 0.083, against the i.i.d. estimate's
-  0.642 → 0.412 → 0.264 → 0.109. It also pins the two directions of the claim: a stable
-  provider is flat at every k, and independent draws make measurement and estimate converge.
+  0.642 → 0.412 → 0.264 → 0.109. Three claims are pinned at once: a stable provider is
+  flat at every k (the surrogate case, asserted rather than assumed), a varying one decays
+  so `pass^3 < pass^1`, and under genuinely independent draws measurement and estimate
+  converge — which is the condition the report's i.i.d. column now labels.
+
+## [0.7.0] - 2026-09-19
+
+A worked trace pair, and the retraction of a headline reliability number that turned out to
+be an assumption.
 
 - **A reliability claim retracted.** The report's `pass^k` table was headed "on repeat
   draws" but computed `p̂^k`, tau-bench's independent-draws estimate. The offline surrogate
@@ -22,8 +27,6 @@ an assumption.
   labelled. The README row that sold the curve is replaced with the retraction, and the
   honest consequence is stated as a limit: no claim about reliability under repetition is
   supported until this runs against a provider at temperature > 0.
-
-
 - **Worked trace pair for `S20_oversized_manifest`** in `docs/examples/traces.md`: the same
   task on `ballast` (8 calls, 2.5k-token peak, refund closed, no `read_scratch` at all) and
   on `naive` (2 calls, then a request nobody could send). Quoted from real runs, including
