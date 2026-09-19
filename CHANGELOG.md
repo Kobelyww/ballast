@@ -5,6 +5,13 @@
 A worked trace pair, and the retraction of a headline reliability number that turned out to be
 an assumption.
 
+- **`tests/test_reliability.py`: the metric is checked against real variance.** The same
+  harness driven by a provider whose draws differ, with the variance injected at the
+  provider boundary — where a real `temperature > 0` would enter. Measured pass^1→2→3→5
+  over 120 runs: 0.642 → 0.417 → 0.300 → 0.083, against the i.i.d. estimate's
+  0.642 → 0.412 → 0.264 → 0.109. It also pins the two directions of the claim: a stable
+  provider is flat at every k, and independent draws make measurement and estimate converge.
+
 - **A reliability claim retracted.** The report's `pass^k` table was headed "on repeat
   draws" but computed `p̂^k`, tau-bench's independent-draws estimate. The offline surrogate
   is deterministic, so every draw of a task is identical and the measured value equals
