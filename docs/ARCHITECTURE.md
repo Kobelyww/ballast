@@ -191,6 +191,22 @@ policy computation preceded a payment, which is what makes `unverified_payment` 
 from state alone. Fixtures inject flaky upstreams (`upstream_timeout`, retryable) so
 resilience is exercised rather than assumed.
 
+### What a sub-agent may and may not see
+
+`AgentConfig.enable_delegation` registers a `delegate(goal)` tool. The child is a full
+`Agent` with a **fresh `ContextEngine`**, its own step cap, and a toolkit filtered to the
+non-mutating tools *minus `delegate` itself*: the child can read and advise, cannot move
+money, and cannot spawn a grandchild. Only the child's final answer and its cost/step
+summary re-enter the parent's window, and the parent emits a `delegate` event carrying the
+child's run id so the trace stays auditable across the boundary.
+
+Two properties are load-bearing and tested (`tests/test_delegation.py`): the parent's
+transcript contains no tool row the child produced, and the child's tool menu contains no
+`delegate` and no mutating tool. The payoff it was built for — a bloated read absorbed by a
+child instead of billed on every later parent turn — is **not measured**: a scripted
+stand-in policy does not follow "read this and report", so the benefit claim waits for a
+real model. Off by default.
+
 ## The measurement layer
 
 `bench/stats.py` holds the inference: Wilson intervals (n=8 should look weak), pass^k in

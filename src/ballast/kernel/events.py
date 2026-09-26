@@ -23,6 +23,7 @@ EventType = Literal[
     "model_call",
     "model_error",
     "tool_call",
+    "delegate",
     "tool_result",
     "tool_rejected",
     "loop_guard",

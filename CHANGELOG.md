@@ -17,6 +17,17 @@ The reliability limitation gets a demonstration instead of a caveat.
   pass^1→2→3→5 = 57.1% → 28.6% → 28.6% → 0.0% with variance injected, flat at 100% without,
   and measurably different from the i.i.d. estimate at every k.
 - **`tests/test_reliability_http.py`** pins both halves in CI over a socket.
+- **Sub-agent context isolation, implemented and bounded.** `AgentConfig.enable_delegation`
+  registers a `delegate(goal)` tool whose child gets a fresh `ContextEngine`, its own step
+  cap, and only the non-mutating tools minus `delegate` — it can read and advise but cannot
+  spend, cannot reach a human (`auto_reject`), and cannot spawn a grandchild. Only the
+  conclusion crosses back, and the parent emits a `delegate` event with the child's run id
+  and cost. Off by default; `tests/test_delegation.py` pins the boundary.
+  **Not claimed:** the token-saving payoff is unmeasured, because a scripted stand-in cannot
+  follow "read this and report" — that experiment needs a real model.
+  Implementing it also surfaced a recursion hole the tests closed: `delegate` is itself
+  non-mutating, so a privilege filter by effect alone handed the child a way to delegate.
+
 
 What this does *not* claim: the variance is injected, not observed from a language model.
 A real provider at temperature > 0 is still the missing experiment.

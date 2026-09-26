@@ -10,7 +10,7 @@ Zero runtime dependencies · every test runs without an API key · auditable, re
 ![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)
 ![license](https://img.shields.io/badge/license-MIT-yellow)
 ![tests](https://img.shields.io/badge/benchmark-59%20tasks%20×%2012%20arms-blue)
-![offline](https://img.shields.io/badge/tests-665%20offline%2C%20no%20API%20key-blueviolet)
+![offline](https://img.shields.io/badge/tests-673%20offline%2C%20no%20API%20key-blueviolet)
 
 </div>
 
@@ -343,7 +343,7 @@ Read these before trusting the table above; they are the interesting part.
 git clone https://github.com/Kobelyww/ballast && cd ballast
 pip install -e ".[dev]"
 
-make test     # 665 tests (13 skipped by design), ~2 min, no API key, no external network
+make test     # 673 tests (13 skipped by design), ~2 min, no API key, no external network
 ballast arms                       # what can be ablated
 ballast run S01_inwindow_refund    # one task, offline, with a full trace
 ballast run S06_high_risk --arm defective --trace
@@ -383,7 +383,8 @@ src/ballast/
                content-addressed cache, record/replay, offline surrogate
   context/     the context window as a budgeted resource: offload, block compaction
   kernel/      agent loop, toolkit w/ schema inference + argument repair, budgets,
-               checkpoints, HITL gate, deterministic invariant checker
+               checkpoints, HITL gate, deterministic invariant checker, sub-agent
+               context isolation (own window, read-only tools, no recursion)
   memory/      episodic store, skill library, distiller, statistical promotion gate
   env/         simulated worlds (SQLite) for two domains — after-sales and SRE
                incidents — with their policy engines, corpora, faults and task decks

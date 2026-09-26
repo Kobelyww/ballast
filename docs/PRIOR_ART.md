@@ -22,7 +22,7 @@ claim, not a substitute for one.
 | Skill library | [Voyager](https://arxiv.org/abs/2305.16291) | Skills are promoted by succeeding in the environment; retrieval by embedding similarity | `candidate → active → retired`, but promotion needs a *holdout* win under paired significance plus a cost bound. Retrieval is BM25 + jaccard, deliberately no embeddings | `memory/promotion.py`; `make gate` exits 1 if nothing promotes, so the gate is tested in CI |
 | Reflexion-style self-correction | [Reflexion](https://arxiv.org/abs/2303.11366) | Verbal self-feedback in the next attempt's prompt | A critic that can only speak through deterministic invariant findings (`kernel/verify.py`), so "the model reflected" is never the evidence | `critic_rounds` per arm; `tests/test_invariants.py` |
 | Task guardrails | [CrewAI](https://docs.crewai.com/en/concepts/tasks) | `guardrail` functions as LLM-as-judge validators | Policy-in-code at the tool layer: `issue_refund` can only move money `compute_refund` already derived. The same module grades the run afterwards | `defective` (171 refused payments), `ops_unassessed` (66), `ops_reckless` (34) arms |
-| Sub-agent context isolation | Anthropic context-engineering guidance | Give each sub-agent a fresh, narrow window | **Not implemented, and the row is here to say so.** The `hierarchical` arm is `plan_execute` plus a second critic round (`bench/runner.py:100`) — planner, worker and critic share one context engine and one budget. The guidance is right that isolation bounds blast radius; this runtime does not yet provide it | The `hierarchical` row in `docs/BENCHMARK.md`, which is the honest evidence of what we *do* have: 100% success at 1.01× the controlled arm's cost, i.e. planning + an extra critic round buys reliability, not isolation |
+| Sub-agent context isolation | Anthropic context-engineering guidance | Give each sub-agent a fresh, narrow window | **Implemented and bounded, not yet benchmarked.** `AgentConfig.enable_delegation` registers a `delegate(goal)` tool; the child gets a fresh `ContextEngine`, its own step cap, and only the non-mutating tools minus `delegate` itself — so it can neither spend money nor spawn a grandchild. Only the child's conclusion re-enters the parent's window. Off by default. What is *not* claimed: with a scripted stand-in the child cannot follow "read this and report", so the token-savings payoff needs a real model — `tests/test_delegation.py` asserts the boundary, not the benefit |
 | Fault attribution by owner | — (our addition) | Not a convention in the above | `agent` / `runtime` / `environment` owners over a code taxonomy, keyed on `(tool, arguments)` — because by tool name alone a batch run closing 24 tickets read as 21 loops | `bench/faults.py`, "Where failures come from" in every report |
 
 ## What this table is for
@@ -35,7 +35,9 @@ mechanism they can compare against the original, in a runtime small enough to re
 **Debt.** Rows where we differ are the places a real system will be tested hardest — the
 `Interrupt` propagation bug, the identity-less handle, and the estimate-passed-as-measurement
 all came from exactly those rows, and all three were found by this repo's own arms rather
-than by a reader.
+than by a reader. The isolation row earned a fourth: implementing it surfaced a recursion
+hole where the child's tool menu inherited the parent's `delegate` tool, because that tool
+is non-mutating and so passed the privilege filter. A test caught it before it shipped.
 
 Regenerate the numbers behind the right-hand column with the commands in
 [`BENCHMARK.md`](BENCHMARK.md).

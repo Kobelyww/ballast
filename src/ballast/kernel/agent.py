@@ -19,6 +19,7 @@ function plus four behaviours that are *not* in the prompt:
 
 from __future__ import annotations
 
+import contextvars
 import json
 import time
 import uuid
@@ -34,7 +35,7 @@ from .events import HitlMode, RunContext
 from .hitl import Interrupt
 from .injection import fence as fence_payload
 from .injection import scan as scan_injection
-from .toolkit import Tool, ToolResult, Toolkit
+from .toolkit import Tool, ToolResult, Toolkit, tool
 
 Strategy = Literal["react", "plan_execute", "reflexion", "hierarchical"]
 
@@ -85,6 +86,12 @@ class AgentConfig:
     fence_untrusted: bool = True
     checkpointer: Any = None
     max_repair_attempts: int = 2
+    # Sub-agent isolation. `delegate` gives a sub-task its own context window and step
+    # cap, so a bloated read inside the sub-task cannot pollute the parent's transcript.
+    # Off by default: the `hierarchical` arm measures planner+critic in one window, and
+    # `isolated` measures the same work with the child in its own.
+    enable_delegation: bool = False
+    delegate_max_steps: int = 8
     # Invariants are a property of the domain, not of the runtime: callable
     # (world, ctx) -> list[Finding]. Supplied by the caller so the loop never has to
     # know what a "refund" or a "page" is.
@@ -138,6 +145,12 @@ class RunResult:
         }
 
 
+# The RunContext of the run currently being executed, so a tool the loop dispatches can
+# report back into the right trace. A contextvar rather than an argument because the tool
+# signature is what the model sees, and `ctx` must not appear in it.
+_CURRENT_CTX: contextvars.ContextVar["RunContext | None"] = contextvars.ContextVar("ballast_run_ctx", default=None)
+
+
 class Agent:
     def __init__(self, config: AgentConfig, *, world: Any = None, kb: Any = None, skills: Any = None) -> None:
         self.config = config
@@ -145,6 +158,84 @@ class Agent:
         self.world = world
         self.kb = kb
         self.skills = skills
+        if config.enable_delegation:
+            # Named explicitly: the bound method is `_delegate`, and a tool the model is
+            # told about must be reachable under the name it will call.
+            config.toolkit.register(tool(self._delegate, name="delegate"))
+
+    # ------------------------------------------------------------- delegation
+    def _delegate(self, goal: str) -> dict[str, Any]:
+        """Hand a sub-task to a fresh agent with its own context window.
+
+        Args:
+            goal: the sub-task, stated so the child can finish it without the parent's
+                transcript — it cannot see what the parent has seen.
+        """
+        cfg = self.config
+        parent_ctx = _CURRENT_CTX.get()
+        # The child advises, the parent acts: a sub-agent gets the non-mutating subset,
+        # so context isolation doubles as a privilege boundary.
+        # `delegate` itself is non-mutating, so the privilege filter alone would hand the
+        # child a way to spawn another child — and the grandchild would run with the
+        # parent's own closure. Excluded by name as well as by effect.
+        child_tools = [
+            t
+            for t in (cfg.toolkit.get(n) for n in cfg.toolkit.names)
+            if t is not None and not t.mutating and t.name != "delegate"
+        ]
+        child_config = AgentConfig(
+            provider=cfg.provider,
+            toolkit=Toolkit(child_tools),
+            model=cfg.model,
+            temperature=cfg.temperature,
+            seed=cfg.seed,
+            max_iterations=cfg.delegate_max_steps,
+            context=ContextPolicy(**cfg.context.as_dict()),
+            budget=RunBudget(
+                max_steps=cfg.delegate_max_steps,
+                max_cost=cfg.budget.max_cost,
+                max_wall_s=cfg.budget.max_wall_s,
+                max_prompt_tokens=cfg.budget.max_prompt_tokens,
+            ),
+            pricing=cfg.pricing,
+            critic_rounds=0,
+            hitl_mode="auto_reject",
+            enable_sop_briefing=cfg.enable_sop_briefing,
+            soft_degrade=False,
+            fence_untrusted=cfg.fence_untrusted,
+            enable_delegation=False,  # no grandchildren
+        )
+        child_ctx = RunContext(
+            task_id=f"{parent_ctx.task_id if parent_ctx else ''}:sub",
+            arm=f"{parent_ctx.arm if parent_ctx else ''}:sub",
+            world=self.world,
+            sop=self.kb,
+            hitl_mode="auto_reject",  # a child never reaches a human; it reports back
+        )
+        child_ctx.scratch = parent_ctx.scratch if parent_ctx else ScratchStore()
+        result = Agent(child_config, world=self.world, kb=self.kb).run(
+            goal, task_id=child_ctx.task_id, arm=child_ctx.arm, ctx=child_ctx
+        )
+        if parent_ctx is not None:
+            parent_ctx.emit(
+                "delegate",
+                goal=goal[:120],
+                child_run_id=result.run_id,
+                steps=result.steps,
+                cost=round(result.cost, 6),
+                peak_prompt_tokens=result.context.get("peak_prompt_tokens", 0),
+                child_status=result.status,
+            )
+        # Only the conclusion crosses back into the parent's window. The child's spend is
+        # reported rather than folded into the parent's ledger total, so a run's cost stays
+        # attributable to the run that incurred it.
+        return {
+            "answer": result.final_text,
+            "status": result.status,
+            "steps": result.steps,
+            "cost": round(result.cost, 6),
+            "peak_prompt_tokens": result.context.get("peak_prompt_tokens", 0),
+        }
 
     # -------------------------------------------------------------------- run
     def run(self, task: str, *, task_id: str = "", arm: str = "", scratch: ScratchStore | None = None, ctx: RunContext | None = None) -> RunResult:
@@ -165,6 +256,7 @@ class Agent:
                 "env.incident_verify.audit) or set critic_rounds=0."
             )
         self.ledger.set_budget(ctx.run_id, self.config.budget)
+        _CURRENT_CTX.set(ctx)
         engine = ContextEngine(self.config.context, scratch=ctx.scratch)
         engine.pin(self._system_prompt())
         brief = self._briefing(task, ctx)
@@ -235,6 +327,7 @@ class Agent:
         for _ in range(int(state.get("steps", 0))):
             self.ledger.bump_step(run_id)
         ctx.events.extend(state.get("events", []))
+        _CURRENT_CTX.set(ctx)
         return self._loop(ctx, engine, task or state.get("task", ""))
 
     # ------------------------------------------------------------------ inner
