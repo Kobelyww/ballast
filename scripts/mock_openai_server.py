@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,13 +28,77 @@ from typing import Any
 
 TICKET_RE = re.compile(r"(T\d{4})")
 
-# A hand-written procedure, expressed the way a model would express it: as decisions
-# over the messages it was sent. Same shape as llm/surrogate.py, but reached through
-# HTTP so the transport, not the policy, is under test.
+# A seeded "model temperature". A deterministic stand-in cannot show reliability under
+# repetition — every draw is a copy of the first, which is exactly the mistake this repo
+# retracted in 0.7.0. Variance here is reproducible, so a decay curve measured over real
+# HTTP is still CI-safe.
+_VARIANCE = {"rate": 0.0, "rng": random.Random(0), "conversations": {}, "opener_count": 0}
+_VARIANCE_LOCK = threading.Lock()
+
+
+def set_variance(rate: float, seed: int = 0) -> None:
+    """Give up early on `rate` of conversations. 0.0 keeps the server deterministic.
+
+    One draw per conversation, not per request: a run makes several calls, and drawing on
+    each compounds one model's flakiness into near-certain failure — that would measure the
+    harness's call count rather than the model's reliability.
+    """
+    with _VARIANCE_LOCK:
+        _VARIANCE["rate"] = rate
+        _VARIANCE["rng"] = random.Random(seed)
+        _VARIANCE["conversations"] = {}
+        _VARIANCE["opener_count"] = 0
+
+
+def _is_opener(messages: list[dict[str, Any]]) -> bool:
+    """The conversation's very first request.
+
+    Not "ends with a user message": the critic and the plan instruction are injected as
+    user turns mid-run too, and drawing there would compound one model's flakiness across
+    a single run — measuring the harness's call count instead of the model's reliability.
+    Not "no tool results yet" either: the transport does not always carry a tool message's
+    `name`, so that test never turns false.
+    """
+    return bool(messages) and messages[-1].get("role") == "user" and not any(
+        m.get("role") == "assistant" for m in messages
+    )
+
+
+def _gives_up(fingerprint: str) -> bool:
+    with _VARIANCE_LOCK:
+        if not _VARIANCE["rate"]:
+            return False
+        seen = _VARIANCE["conversations"]
+        if fingerprint not in seen:
+            seen[fingerprint] = _VARIANCE["rng"].random() < _VARIANCE["rate"]
+        return seen[fingerprint]
+
+
+def _claim_type(blob: str) -> str:
+    """Derive the claim from the ticket text, the way a model reading it would."""
+    for needle, claim in (("质量", "quality"), ("少发", "missing_item"), ("损坏", "damaged"), ("地址", "address")):
+        if needle in blob:
+            return claim
+    return "no_reason"
+
+
 def decide(body: dict[str, Any]) -> dict[str, Any]:
+    """A hand-written procedure, expressed the way a model would express it: as decisions
+    over the messages it was sent. Same shape as `llm/surrogate.py`, but reached through
+    HTTP so the transport, not the policy, is under test.
+    """
     messages = body.get("messages") or []
     blob = " ".join(str(m.get("content", "")) for m in messages)
     role_names = {str(m.get("name", "")) for m in messages if m.get("role") == "tool"}
+
+    if _VARIANCE["rate"] and _is_opener(messages):
+        # One draw per conversation. Repeats of the same task arrive with an identical
+        # opening, so the identity is the request count, not its text.
+        with _VARIANCE_LOCK:
+            _VARIANCE["opener_count"] += 1
+            ordinal = _VARIANCE["opener_count"]
+        if _gives_up(str(ordinal)):
+            return {"role": "assistant", "content": "信息不足，先挂起等待人工处理。"}
 
     def call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -57,7 +122,7 @@ def decide(body: dict[str, Any]) -> dict[str, Any]:
     if "search_sop" not in role_names:
         return call("search_sop", {"query": "退款 无理由 政策 窗口", "top_k": 2})
     if order_id and "compute_refund" not in role_names:
-        return call("compute_refund", {"order_id": order_id, "claim_type": "no_reason"})
+        return call("compute_refund", {"order_id": order_id, "claim_type": _claim_type(blob)})
     computed = next((m for m in messages if m.get("role") == "tool" and m.get("name") == "compute_refund"), None)
     decision: dict[str, Any] = {}
     if computed:
@@ -165,10 +230,16 @@ def reset() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8099)
+    parser.add_argument("--flaky-rate", type=float, default=0.0,
+                        help="fraction of fresh conversations where the stand-in model gives up early")
+    parser.add_argument("--variance-seed", type=int, default=0,
+                        help="makes the injected variance reproducible, so a decay curve is CI-safe")
     args = parser.parse_args()
     Handler.flaky_left = 0
+    set_variance(args.flaky_rate, args.variance_seed)
     httpd, _ = serve(args.port)
-    print(f"mock OpenAI-compatible server on http://127.0.0.1:{args.port}")
+    print(f"mock OpenAI-compatible server on http://127.0.0.1:{args.port}"
+          + (f" (flaky_rate={args.flaky_rate}, seed={args.variance_seed})" if args.flaky_rate else ""))
     print(f'try: BALLAST_LLM_API_KEY=mock BALLAST_LLM_BASE_URL=http://127.0.0.1:{args.port} python -m ballast.cli eval --provider openai-compat --model mock-chat')
     try:
         threading.Event().wait()

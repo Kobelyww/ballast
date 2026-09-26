@@ -298,10 +298,15 @@ Read these before trusting the table above; they are the interesting part.
   because a retrieved policy briefing is overhead when the answer was already in the window.
   If your agent handles one ticket per context, run `naive`. The crossover figure is what
   tells you which world you are in, and it is measured here rather than asserted.
-- **`pass^k` is flat here, and that is the finding.** A deterministic stand-in cannot show
-  run-to-run decay; the i.i.d. column in the report is a model, clearly labelled, and the
-  only reason to run this suite against a real provider at temperature > 0 is to replace it
-  with measurement. Until then no claim about *reliability under repetition* is supported.
+- **`pass^k` is flat for the offline surrogate, and that is the finding — but it is no
+  longer an untested claim.** A deterministic stand-in has no run-to-run decay to show, so
+  the report's i.i.d. column is a labelled model, not data. `scripts/measure_http_reliability.py`
+  closes the gap without a key: the production runner and graders, the model reached over
+  real HTTP against the bundled mock server on loopback, with seeded variance. Measured
+  pass^1→2→3→5 = **57.1% → 28.6% → 28.6% → 0.0%** while the deterministic provider stays at
+  100% at every k, and the measurement does not equal `p̂^k` (70.7% / 50.0% / 35.4% / 17.7%).
+  Two tests in `tests/test_reliability_http.py` pin both halves in CI. What is still missing
+  is a *real* model: the decay here is injected, not observed from a language model.
 - **Everything passes except the arms designed to fail.**
   100% on is a mechanism test, not a difficulty ceiling: the discriminating signal comes
   from the deliberately defective arms and from cost. That is now a *liability* of the

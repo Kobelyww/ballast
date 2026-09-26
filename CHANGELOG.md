@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.10.0] - 2026-09-19
+
+The reliability limitation gets a demonstration instead of a caveat.
+
+- **`scripts/mock_openai_server.py` can now vary like a model.** `set_variance(rate, seed)` /
+  `--flaky-rate` makes a share of conversations give up on their first turn, drawn **once per
+  conversation** — detecting the opener as "no assistant turn yet", because the critic and
+  plan instructions also arrive as user turns and drawing there compounds one model's
+  flakiness across a single run. Its refund procedure also derives `claim_type` from the
+  ticket text instead of hardcoding `no_reason`, so it can complete quality and
+  missing-item tasks too.
+- **`scripts/measure_http_reliability.py`** runs the production runner and graders against
+  that server over real HTTP on loopback and writes
+  [`bench/results/reliability-http.md`](bench/results/reliability-http.md): measured
+  pass^1→2→3→5 = 57.1% → 28.6% → 28.6% → 0.0% with variance injected, flat at 100% without,
+  and measurably different from the i.i.d. estimate at every k.
+- **`tests/test_reliability_http.py`** pins both halves in CI over a socket.
+
+What this does *not* claim: the variance is injected, not observed from a language model.
+A real provider at temperature > 0 is still the missing experiment.
+
 ## [0.9.0] - 2026-09-19
 
 README numbers stop being hand-maintained.
